@@ -1,0 +1,61 @@
+<!-- Activity Log Page -->
+<div v-if="currentPage === 'fifo_logs' || currentPage === 4" class="max-w-6xl mx-auto">
+    <div class="flex justify-between items-end mb-8">
+        <div>
+            <h1 class="text-3xl font-black tracking-tight text-slate-700 flex items-center gap-3">
+                <span class="w-3.5 h-3.5 rounded-full bg-teal-400"></span> FIFO Activity Log & Audit Trail
+            </h1>
+            <p class="text-slate-500 text-sm mt-1 font-medium">All DROP / PICKUP warehouse execution history and operator records</p>
+        </div>
+        <button @click="downloadHistory" class="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-semibold text-sm rounded-xl transition shadow-sm inline-flex items-center gap-2 cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Download CSV
+        </button>
+    </div>
+
+    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-8 flex gap-4">
+        <input v-model="logFilter.user" placeholder="Filter by User"
+            class="p-2.5 input-pastel rounded-xl text-sm w-48 font-medium">
+
+        <input v-model="logFilter.point" placeholder="Filter by Storage Unit"
+            class="p-2.5 input-pastel rounded-xl text-sm w-48 font-medium">
+
+        <select v-model="logFilter.action"
+            class="p-2.5 input-pastel rounded-xl text-sm cursor-pointer font-medium text-slate-600">
+            <option value="">ALL EVENTS</option>
+            <option value="DROP">DROP EVENTS</option>
+            <option value="PICKUP">PICKUP EVENTS</option>
+        </select>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-10">
+        <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 text-xs text-slate-400 font-extrabold uppercase border-b border-slate-100">
+                <tr>
+                    <th class="p-4 pl-6">Time</th>
+                    <th class="p-4">Action</th>
+                    <th class="p-4">User</th>
+                    <th class="p-4">Storage Unit</th>
+                    <th class="p-4">Item</th>
+                    <th class="p-4 pr-6">Note</th>
+                </tr>
+            </thead>
+
+            <tbody class="divide-y divide-slate-50">
+                <tr v-for="h in filteredHistory" :key="h.time" class="hover:bg-slate-50/50 transition-colors">
+                    <td class="p-4 pl-6 text-xs text-slate-400 font-mono" v-text="formatTime(h.time)"></td>
+                    <td class="p-4">
+                        <span :class="['px-2.5 py-1 rounded-md text-[10px] font-black border tracking-wider', (h.action || '').includes('DROP') ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-teal-50 text-teal-600 border-teal-100']" v-text="h.action"></span>
+                    </td>
+                    <td class="p-4 font-bold text-slate-600" v-text="h.user_id"></td>
+                    <td class="p-4 text-indigo-500 font-mono font-black" v-text="h.point_name"></td>
+                    <td class="p-4 text-slate-500 font-semibold" v-text="h.item_type"></td>
+                    <td class="p-4 pr-6 text-slate-400 text-xs italic" v-text="h.note || '-'"></td>
+                </tr>
+                <tr v-if="filteredHistory.length === 0">
+                    <td colspan="6" class="p-10 text-center text-slate-400 font-medium">No matching logs found.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>

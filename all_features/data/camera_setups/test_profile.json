@@ -1,0 +1,11 @@
+{
+  "profile_name": "test_profile",
+  "saved_at": "2026-08-19 16:18:46",
+  "camera_index": 0,
+  "settings": {
+    "brightness": 25,
+    "contrast": 1.5,
+    "exposure": 2,
+    "threshold": 120
+  }
+}

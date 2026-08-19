@@ -1,0 +1,8 @@
+*.tar
+*.gz
+.git
+__pycache__/
+venv/
+env/
+.venv/
+node_modules/

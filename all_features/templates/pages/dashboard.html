@@ -1,0 +1,182 @@
+<!-- Pure FIFO Dashboard Page -->
+<div v-if="currentPage === 'fifo_dashboard' || currentPage === 1" class="max-w-7xl mx-auto">
+    <!-- Header Section -->
+    {% include 'components/header.html' %}
+
+    <div class="grid grid-cols-2 gap-6 mb-8 items-stretch">
+        <!-- Drop Operations Panel -->
+        <div class="bg-white p-7 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between min-h-[360px]">
+            <div class="flex flex-col gap-5">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center">
+                            <span class="w-3 h-3 rounded-full bg-indigo-400"></span>
+                        </div>
+                        <h2 class="text-xl font-extrabold text-slate-700">Drop Operations</h2>
+                    </div>
+                </div>
+                <div class="grid grid-cols-[1fr_auto] gap-3 items-end">
+                    <div>
+                        <label class="text-xs text-slate-500 font-bold block mb-1.5">Item Type</label>
+                        <input v-model="formDrop.item_type" class="w-full p-3 input-pastel rounded-xl text-sm font-semibold" placeholder="e.g. cookie, box, pallet">
+                    </div>
+                    <button @click="handleScanAndFill" class="bg-rose-100 text-rose-600 border border-rose-200 h-[46px] px-6 rounded-xl font-black hover:bg-rose-200 transition text-sm flex items-center justify-center">
+                        FIND STORAGE
+                    </button>
+                </div>
+                
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 h-[115px] flex flex-col justify-center overflow-hidden">
+                    <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Suggested Locations</div>
+                    <div v-if="!scanResult.hasScanned" class="text-center text-slate-400 text-xs py-2 font-medium">
+                        Enter item type and click FIND STORAGE to get matching slots
+                    </div>
+                    <div v-else-if="scanResult.slots.length === 0" class="text-rose-500 text-xs font-bold py-2 text-center bg-rose-50 rounded-lg">
+                        No available storage units matched.
+                    </div>
+                    <div v-else class="flex gap-2 overflow-x-auto pb-1 custom-scrollbar whitespace-nowrap items-center">
+                        <div v-for="s in scanResult.slots" :key="s.point_name" @click="selectAndFocusSlot(s.point_name)" 
+                             class="border border-indigo-100 bg-white rounded-xl p-2.5 flex flex-col justify-between items-center cursor-pointer hover:border-indigo-300 hover:shadow-md transition text-center min-w-[85px] max-w-[85px] h-[55px] flex-shrink-0">
+                            <div class="font-extrabold text-slate-700 text-xs tracking-wide truncate w-full" v-text="s.point_name"></div>
+                            <div :class="['px-2 py-0.5 rounded text-[9px] font-bold', s.priority === 1 ? 'text-emerald-600 bg-emerald-50' : 'text-amber-600 bg-amber-50']" v-text="s.action_type"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs text-slate-500 font-bold block mb-1.5">Point Name</label>
+                        <input ref="dropPointInput" v-model="formDrop.point_name" class="w-full p-3 input-pastel rounded-xl text-sm font-semibold" placeholder="e.g. P-01">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-500 font-bold block mb-1.5">Operation Note</label>
+                        <input v-model="formDrop.note" class="w-full p-3 input-pastel rounded-xl text-sm" placeholder="Optional notes...">
+                    </div>
+                </div>
+            </div>
+            <button @click="dropItem" class="w-full bg-indigo-500 text-white p-3.5 rounded-xl font-bold hover:bg-indigo-600 transition text-sm tracking-wide shadow-md shadow-indigo-200 mt-5">
+                CONFIRM DROP
+            </button>
+        </div>
+
+        <!-- Pickup Operations Panel -->
+        <div class="bg-white p-7 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between min-h-[360px]">
+            <div class="flex flex-col gap-4">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-teal-50 flex items-center justify-center">
+                            <span class="w-3 h-3 rounded-full bg-teal-400"></span>
+                        </div>
+                        <h2 class="text-xl font-extrabold text-slate-700">Pickup Operations</h2>
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <label class="text-xs text-slate-500 font-bold block mb-1.5">Target Item Type (FIFO Dispatch)</label>
+                    <input v-model="formPickup.item_type" class="w-full p-3 input-pastel rounded-xl text-sm font-semibold" placeholder="Enter item type to dispatch oldest...">
+                </div>
+                <button @click="pickupItem" class="w-full bg-teal-500 text-white p-3.5 rounded-xl font-bold hover:bg-teal-600 transition text-sm shadow-md shadow-teal-200">
+                    REQUEST FIFO PICKUP
+                </button>
+            </div>
+
+            <div v-if="pickupResult.show" class="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex items-center justify-between mt-4 shadow-inner">
+                <div>
+                    <div class="text-[10px] text-teal-600 font-bold uppercase tracking-wider">Target Dispatch Point</div>
+                    <div class="text-3xl font-black text-slate-700 mt-1 tracking-tight" v-text="pickupResult.target"></div>
+                </div>
+                <div class="text-right border-l pl-5 border-slate-200">
+                    <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Payload Note</div>
+                    <div class="text-sm font-bold text-amber-600 mt-1 max-w-[120px] truncate" v-text="pickupResult.note"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Inventory Grid Table -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-10">
+        <div class="p-6 border-b border-slate-100 bg-white flex justify-between items-center">
+            <h2 class="font-extrabold text-lg text-slate-700 tracking-wide">Inventory Flow</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-50/50 text-slate-400 font-bold text-[10px] uppercase tracking-wider border-b border-slate-100">
+                        <th class="p-5">Location</th>
+                        <th class="p-5">Allowed Items</th>
+                        <th class="p-5">Current Item</th>
+                        <th class="p-5">Queue (FIFO Order)</th>
+                        <th class="p-5">Stored Timestamp</th>
+                        <th class="p-5 text-center">Status</th>
+                        <th class="p-5 text-center">Sensor</th>
+                        <th class="p-5 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50 text-xs font-semibold">
+                    <template v-for="(groupSlots, category) in groupedSlots" :key="category">
+                        <tr class="bg-slate-100/50 border-t-2 border-slate-200">
+                            <td colspan="8" class="px-5 py-2 text-[11px] font-black tracking-wider uppercase text-slate-500">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+                                    <span v-text="category"></span>
+                                    <span class="text-[10px] font-normal text-slate-400" v-text="'(' + groupSlots.length + ' points)'"></span>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr v-for="s in groupSlots" :key="s.point_name" class="hover:bg-slate-50/80 transition-colors">
+                            <td class="p-5">
+                                <div class="font-bold text-slate-800 text-sm" v-text="s.point_name"></div>
+                            </td>
+                            <td class="p-5">
+                                <div class="flex gap-1 flex-wrap">
+                                    <span v-for="item in s.allowed_item" :key="item" class="bg-slate-100 text-slate-500 text-[10px] px-2 py-0.5 rounded font-mono" v-text="item"></span>
+                                    <span v-if="!s.allowed_item || s.allowed_item.length === 0" class="text-slate-400 italic text-[11px]">Any Item</span>
+                                </div>
+                            </td>
+                            <td class="p-5 font-mono text-slate-600">
+                                <span v-if="s.item_type" class="bg-indigo-50 text-indigo-700 px-2 py-1 rounded-md font-bold" v-text="s.item_type"></span>
+                                <span v-else class="text-slate-300">-</span>
+                            </td>
+                            <td class="p-5">
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <div v-for="(q, idx) in s.queue" :key="idx" 
+                                         :class="['text-[10px] px-2 py-1 rounded-lg border font-mono flex items-center gap-1 shadow-xs', 
+                                                  idx === 0 ? 'bg-amber-50 border-amber-200 text-amber-800 font-bold' : 'bg-slate-50 border-slate-200 text-slate-600']">
+                                        <span class="w-1.5 h-1.5 rounded-full" :class="idx === 0 ? 'bg-amber-500' : 'bg-slate-400'"></span>
+                                        <span v-text="'#' + (idx + 1) + ' ' + q.user_id + ' (P' + q.priority + ')'"></span>
+                                    </div>
+                                    <span v-if="!s.queue || s.queue.length === 0" class="text-slate-300 italic text-[11px]">Empty</span>
+                                </div>
+                            </td>
+                            <td class="p-5 text-slate-400 font-mono text-[11px]" v-text="formatTime(s.timestamp)"></td>
+                            <td class="p-5 text-center">
+                                <span :class="['px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider inline-block',
+                                    s.status === 'EMPTY' ? 'bg-slate-100 text-slate-400' :
+                                    s.status === 'DROP_RESERVED' ? 'bg-indigo-100 text-indigo-700 animate-pulse' :
+                                    s.status === 'FULL' ? 'bg-emerald-100 text-emerald-700' :
+                                    s.status === 'PICKUP_RESERVED' ? 'bg-teal-100 text-teal-700 animate-pulse' : 'bg-slate-100 text-slate-400'
+                                ]" v-text="s.status"></span>
+                            </td>
+                            <td class="p-5 text-center">
+                                <span :class="['px-2.5 py-1 rounded-full text-[10px] font-black uppercase inline-block',
+                                    s.detected ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-400'
+                                ]" v-text="s.detected ? 'DETECTED' : 'CLEAR'"></span>
+                            </td>
+                            <td class="p-5 text-right">
+                                <div class="flex justify-end gap-2">
+                                    <button v-if="s.status === 'DROP_RESERVED' || s.status === 'PICKUP_RESERVED'" 
+                                            @click="confirmAction(s.point_name)"
+                                            class="bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] px-3 py-1.5 rounded-lg font-bold transition shadow-sm">
+                                        Confirm
+                                    </button>
+                                    <button @click="resetSlot(s.point_name)" 
+                                            class="bg-slate-100 hover:bg-rose-50 text-slate-400 hover:text-rose-500 text-[11px] px-2.5 py-1.5 rounded-lg font-bold transition">
+                                        Reset
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
