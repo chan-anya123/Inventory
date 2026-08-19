@@ -29,7 +29,9 @@ class ManualService:
         self.base_dir = base_dir or get_default_base_dir()
         self.readme_path = os.path.join(self.base_dir, "MANUAL.md")
         self.templates_dir = os.path.join(self.base_dir, "templates")
-        self.html_path = os.path.join(self.templates_dir, "manual.html")
+        self.html_path = os.path.join(self.templates_dir, "manual/standalone.html")
+        if not os.path.exists(self.html_path):
+            self.html_path = os.path.join(self.templates_dir, "manual.html")
         if not os.path.exists(self.html_path):
             fallback = os.path.join(self.base_dir, "manual.html")
             if os.path.exists(fallback):

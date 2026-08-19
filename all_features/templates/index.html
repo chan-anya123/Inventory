@@ -198,17 +198,17 @@
 
     <!-- Main Content Container -->
     <main class="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50">
-        <!-- FIFO System Pages -->
-        {% include 'pages/dashboard.html' %}
-        {% include 'pages/config.html' %}
-        {% include 'pages/activity_log.html' %}
+        <!-- 📦 FIFO Storage System Feature -->
+        {% include 'fifo/dashboard.html' %}
+        {% include 'fifo/config.html' %}
+        {% include 'fifo/activity_log.html' %}
 
-        <!-- QR Scanner System Pages -->
-        {% include 'pages/qr_scanner.html' %}
-        {% include 'pages/qr_config.html' %}
+        <!-- 📷 QR Barcode Scanner Feature -->
+        {% include 'qr_code/scanner.html' %}
+        {% include 'qr_code/config.html' %}
 
-        <!-- Documentation Page -->
-        {% include 'pages/manual_view.html' %}
+        <!-- 📖 Documentation & System Guide -->
+        {% include 'manual/view.html' %}
     </main>
 </div>
 

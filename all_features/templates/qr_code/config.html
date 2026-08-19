@@ -1,0 +1,204 @@
+<!-- QR Camera Configuration Page with Camera Enable/Disable Toggle -->
+<div v-if="currentPage === 'qr_config' || currentPage === 5" class="max-w-6xl mx-auto">
+    <div class="flex justify-between items-end mb-8">
+        <div>
+            <h1 class="text-3xl font-black tracking-tight text-slate-700 flex items-center gap-3">
+                <span class="w-3.5 h-3.5 rounded-full bg-indigo-500"></span> QR Camera Settings & Vision Config
+            </h1>
+            <p class="text-slate-500 text-sm mt-1 font-medium">Hardware device configuration, optical image processing sliders, and setup profiles</p>
+        </div>
+        
+        <div class="flex items-center gap-3">
+            <!-- Camera Power Toggle -->
+            <button @click="toggleCamera" :class="[
+                'text-xs px-4 py-2.5 rounded-xl font-bold transition shadow-sm flex items-center gap-2 cursor-pointer',
+                cameraEnabled ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-200' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+            ]">
+                <span :class="['w-2.5 h-2.5 rounded-full', cameraEnabled ? 'bg-white animate-ping' : 'bg-slate-400']"></span>
+                <span v-text="cameraEnabled ? 'Camera ON (Disable)' : 'Camera OFF (Enable)'"></span>
+            </button>
+
+            <button @click="autoAdjustCamera" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs px-4 py-2.5 rounded-xl font-bold transition shadow-sm flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                <span>Auto-Adjust Vision</span>
+            </button>
+            <button @click="resetCameraSettings" class="bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 text-xs px-4 py-2.5 rounded-xl font-bold transition shadow-sm">
+                Reset Factory Defaults
+            </button>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-10">
+        
+        <!-- Left Column: Settings, Sliders & Profiles (7 cols) -->
+        <div class="lg:col-span-7 flex flex-col gap-6">
+            
+            <!-- Device Selection Card -->
+            <div class="bg-white p-7 rounded-3xl shadow-sm border border-slate-100 flex flex-col gap-4">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h2 class="font-extrabold text-base text-slate-700 flex items-center gap-2.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-indigo-400"></span> Video Input Hardware
+                    </h2>
+                    <button @click="fetchCameras" class="text-xs text-indigo-600 font-bold hover:underline">
+                        Refresh Device List
+                    </button>
+                </div>
+
+                <div>
+                    <label class="text-xs text-slate-500 font-bold block mb-1.5">Selected Camera Device</label>
+                    <select v-model="activeCameraIndex" @change="switchCamera(activeCameraIndex)" class="w-full p-3 input-pastel rounded-xl text-sm font-semibold cursor-pointer">
+                        <option v-for="c in availableCameras" :key="c.index" :value="c.index" v-text="c.name"></option>
+                    </select>
+                </div>
+
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between items-center text-xs text-slate-500 font-medium">
+                    <span>Driver Backend: <strong class="text-slate-700">Linux V4L2</strong></span>
+                    <span>Resolution: <strong class="text-slate-700">640x480 @ 30 FPS</strong></span>
+                    <span>Autofocus: <strong class="text-emerald-600">Suppressed (Fixed)</strong></span>
+                </div>
+            </div>
+
+            <!-- Vision Image Processing Sliders -->
+            <div class="bg-white p-7 rounded-3xl shadow-sm border border-slate-100 flex flex-col gap-5">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h2 class="font-extrabold text-base text-slate-700 flex items-center gap-2.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-teal-400"></span> Optical Filter & Enhancement
+                    </h2>
+                    <span class="text-xs text-slate-400 font-bold">Real-time Apply</span>
+                </div>
+
+                <div class="space-y-5">
+                    <!-- Brightness -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <label class="text-xs font-bold text-slate-600">Brightness (-100 to 100)</label>
+                            <span class="font-mono text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md" v-text="cameraSettings.brightness"></span>
+                        </div>
+                        <input type="range" min="-100" max="100" v-model.number="cameraSettings.brightness" @input="updateCameraSettings" class="w-full accent-indigo-500 cursor-pointer">
+                    </div>
+
+                    <!-- Contrast -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <label class="text-xs font-bold text-slate-600">Contrast Multiplier (0.1 to 3.0)</label>
+                            <span class="font-mono text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md" v-text="cameraSettings.contrast"></span>
+                        </div>
+                        <input type="range" min="0.1" max="3.0" step="0.1" v-model.number="cameraSettings.contrast" @input="updateCameraSettings" class="w-full accent-indigo-500 cursor-pointer">
+                    </div>
+
+                    <!-- Exposure EV Shift -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <label class="text-xs font-bold text-slate-600">Software Exposure Shift (-5 to 5)</label>
+                            <span class="font-mono text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md" v-text="cameraSettings.exposure"></span>
+                        </div>
+                        <input type="range" min="-5" max="5" v-model.number="cameraSettings.exposure" @input="updateCameraSettings" class="w-full accent-indigo-500 cursor-pointer">
+                    </div>
+
+                    <!-- Threshold -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <label class="text-xs font-bold text-slate-600">Binarization Threshold (0 = Disabled, 1-255 = Hard BW)</label>
+                            <span class="font-mono text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md" v-text="cameraSettings.threshold === 0 ? 'Disabled' : cameraSettings.threshold"></span>
+                        </div>
+                        <input type="range" min="0" max="255" v-model.number="cameraSettings.threshold" @input="updateCameraSettings" class="w-full accent-indigo-500 cursor-pointer">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Presets Management -->
+            <div class="bg-white p-7 rounded-3xl shadow-sm border border-slate-100 flex flex-col gap-4">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h2 class="font-extrabold text-base text-slate-700 flex items-center gap-2.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span> Camera Setup Profiles
+                    </h2>
+                </div>
+
+                <div class="flex gap-3 items-center">
+                    <input v-model="newProfileName" class="p-2.5 input-pastel text-xs rounded-xl flex-1 font-semibold" placeholder="Enter profile name (e.g. LowLight_Warehouse)...">
+                    <button @click="saveCameraProfile" class="bg-amber-100 text-amber-800 border border-amber-200 text-xs px-4 py-2.5 rounded-xl font-bold hover:bg-amber-200 transition shadow-sm">
+                        Save Current Setup
+                    </button>
+                </div>
+
+                <!-- Profile list -->
+                <div class="space-y-2 mt-2 max-h-48 overflow-y-auto custom-scrollbar">
+                    <div v-for="p in cameraProfiles" :key="p.filename" class="bg-slate-50 p-3 rounded-xl border border-slate-100 flex justify-between items-center hover:bg-slate-100/70 transition">
+                        <div>
+                            <div class="font-bold text-xs text-slate-700" v-text="p.name"></div>
+                            <div class="text-[10px] text-slate-400 font-mono" v-text="'B: ' + (p.settings ? p.settings.brightness : 0) + ' | C: ' + (p.settings ? p.settings.contrast : 1) + ' | E: ' + (p.settings ? p.settings.exposure : 0) + ' | T: ' + (p.settings ? p.settings.threshold : 0)"></div>
+                        </div>
+                        <button @click="loadCameraProfile(p.filename)" class="bg-white text-indigo-600 border border-indigo-100 hover:bg-indigo-50 text-xs px-3 py-1.5 rounded-lg font-bold transition shadow-sm">
+                            Apply Profile
+                        </button>
+                    </div>
+                    <div v-if="cameraProfiles.length === 0" class="text-center text-slate-400 text-xs py-4">
+                        No custom profiles saved yet.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Live Monitor Preview & Diagnostics (5 cols) -->
+        <div class="lg:col-span-5 flex flex-col gap-6">
+            
+            <!-- Live Preview Card -->
+            <div class="bg-white p-7 rounded-3xl shadow-sm border border-slate-100 flex flex-col gap-4">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-black uppercase tracking-wider text-slate-400">Live Viewport Stream</span>
+                    <span :class="['text-[10px] px-2.5 py-0.5 rounded-md font-bold', cameraEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500']" v-text="cameraEnabled ? 'ONLINE' : 'STANDBY'"></span>
+                </div>
+
+                <div class="relative bg-slate-950 rounded-2xl overflow-hidden aspect-[4/3] flex items-center justify-center border border-slate-800 shadow-inner">
+                    <template v-if="cameraEnabled">
+                        <img :src="'/video_feed?t=' + cameraStreamKey" alt="Live Feed Preview" class="w-full h-full object-cover">
+                    </template>
+                    <div v-else class="flex flex-col items-center justify-center text-center p-6 text-slate-400 gap-2">
+                        <div class="text-2xl">📷</div>
+                        <div class="text-xs font-bold text-slate-300">Camera is in Standby</div>
+                        <button @click="enableCamera" class="mt-1 bg-indigo-500 hover:bg-indigo-600 text-white text-[11px] font-bold px-3.5 py-1.5 rounded-lg transition shadow">
+                            Turn On Preview
+                        </button>
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <button @click="currentPage = 'qr_scanner'" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white p-3 rounded-xl font-bold text-xs transition shadow-md shadow-indigo-200 flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                        <span>Open Full QR Scanner Studio</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Health & Hardware Diagnostics -->
+            <div class="bg-white p-7 rounded-3xl shadow-sm border border-slate-100 flex flex-col gap-4">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 class="font-extrabold text-sm text-slate-700 uppercase tracking-wider">Device Diagnostics</h3>
+                    <button @click="fetchCameraHealth" class="text-xs text-indigo-600 font-bold hover:underline">Check Health</button>
+                </div>
+
+                <div class="space-y-3 text-xs">
+                    <div class="flex justify-between py-1 border-b border-slate-50">
+                        <span class="text-slate-500">Camera Status</span>
+                        <span :class="cameraHealth.camera_connected ? 'text-emerald-600 font-bold' : 'text-slate-400 font-bold'"
+                              v-text="cameraHealth.camera_connected ? 'Connected (/dev/video' + activeCameraIndex + ')' : 'Standby / Disabled'">
+                        </span>
+                    </div>
+                    <div class="flex justify-between py-1 border-b border-slate-50">
+                        <span class="text-slate-500">Frame Stream Health</span>
+                        <span class="font-bold text-slate-700" v-text="cameraHealth.has_latest_frame ? 'Streaming Active' : 'Idle / Standby'"></span>
+                    </div>
+                    <div class="flex justify-between py-1 border-b border-slate-50">
+                        <span class="text-slate-500">Last Frame Latency</span>
+                        <span class="font-mono font-bold text-slate-700" v-text="cameraHealth.seconds_since_last_frame !== undefined ? cameraHealth.seconds_since_last_frame + 's' : '—'"></span>
+                    </div>
+                    <div class="flex justify-between py-1">
+                        <span class="text-slate-500">Engine Uptime</span>
+                        <span class="font-mono font-bold text-slate-700" v-text="cameraHealth.uptime_seconds !== undefined ? cameraHealth.uptime_seconds + 's' : '—'"></span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>

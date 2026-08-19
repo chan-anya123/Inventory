@@ -68,19 +68,22 @@ all_features/
 ├── static/                             # Frontend assets, icons, and branding logos
 │   ├── white_logo.svg
 │   └── *.png
-├── templates/                          # Modular Jinja2 + Vue 3 templates
-│   ├── components/                     # Reusable UI partials
-│   │   ├── sidebar.html                # Collapsible Dropdown Accordion Navigation
-│   │   └── header.html                 # Warehouse Status & Operator Badge
-│   ├── pages/                          # Dedicated full-page feature views
+├── templates/                          # Feature-separated modular Jinja2 + Vue 3 templates
+│   ├── fifo/                           # 📦 FIFO System Templates
 │   │   ├── dashboard.html              # FIFO Inventory Flow & Drop/Pickup Dashboard
-│   │   ├── config.html                 # FIFO Storage Nodes & Operator Settings
-│   │   ├── activity_log.html           # Historical Audit Log & CSV Export
-│   │   ├── qr_scanner.html             # Dedicated Optical Scanner Studio View
-│   │   ├── qr_config.html              # Hardware Device & Image Filter Tuning View
-│   │   └── manual_view.html            # Native Markdown Documentation View
-│   ├── index.html                      # Main single-page application layout
-│   └── manual.html                     # Standalone full-page user manual
+│   │   ├── config.html                 # Storage Nodes & Operator Priorities Settings
+│   │   └── activity_log.html           # Historical Audit Log & CSV Export View
+│   ├── qr_code/                        # 📷 QR & Barcode Scanner Vision Templates
+│   │   ├── scanner.html                # Dedicated Optical Scanner Studio View
+│   │   └── config.html                 # Hardware Device & Image Processing Filter View
+│   ├── manual/                         # 📖 System Documentation Templates
+│   │   ├── view.html                   # Native In-Page Markdown Reader View
+│   │   └── standalone.html             # Standalone Full-Page User Manual
+│   ├── components/                     # Reusable UI partial components
+│   │   ├── sidebar.html                # Collapsible Dropdown Accordion Navigation
+│   │   └── header.html                 # Warehouse Status & Operator Profile Badge
+│   ├── index.html                      # Main Single-Page Application Orchestrator
+│   └── manual.html                     # Backward-compatible manual entrypoint
 ├── MANUAL.md                           # System documentation in Markdown
 ├── README.md                           # Project technical overview
 ├── requirements.txt                    # Python dependencies
