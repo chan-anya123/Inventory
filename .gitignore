@@ -1,6 +1,5 @@
 venv/
-venv/
-README.md
-pic/
-scan_drop/
-test/
+all_features/
+__pycache__/
+*.pyc
+*.tar

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Control System Manual</title>
+    <!-- Import Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS with Typography plugin -->
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <!-- Marked.js Markdown parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #f8fafc;
+            background-image: radial-gradient(#e2e8f0 1.5px, transparent 1.5px);
+            background-size: 24px 24px;
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Smooth slide-in animation */
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slide-up {
+            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* Skeleton loader */
+        .skeleton {
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased selection:bg-indigo-100 min-h-screen pb-16">
+
+    <!-- Premium Manual Header -->
+    <header class="w-full bg-gradient-to-r from-slate-900 to-indigo-950 text-white py-12 px-6 shadow-md relative overflow-hidden mb-12 border-b border-indigo-900/40">
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(99,102,241,0.15),transparent_45%)]"></div>
+        <div class="max-w-4xl mx-auto flex flex-col md:flex-row md:items-center justify-between relative z-10 gap-6">
+            <div>
+                <span class="px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-full text-xs font-bold uppercase tracking-wider border border-indigo-500/30">Documentation</span>
+                <h1 class="text-4xl font-extrabold tracking-tight mt-2 bg-gradient-to-r from-white via-indigo-100 to-slate-200 bg-clip-text text-transparent">Inventory Control System Manual</h1>
+                <p class="text-slate-400 text-sm mt-1.5 font-medium">Inventory Control System & API Reference</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-xs text-indigo-200/70 bg-indigo-950/60 px-3.5 py-2 rounded-xl border border-indigo-800/40 font-mono font-medium">v1.2.0</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="max-w-4xl mx-auto px-4 md:px-0">
+        <div class="bg-white p-8 md:p-12 rounded-3xl shadow-xl shadow-slate-100/50 border border-slate-200/80 animate-slide-up relative">
+            
+            <!-- Skeleton Loader -->
+            <div id="loader" class="space-y-6 py-6">
+                <div class="h-8 skeleton w-2/3 rounded-lg"></div>
+                <div class="space-y-3">
+                    <div class="h-4 skeleton w-full rounded"></div>
+                    <div class="h-4 skeleton w-5/6 rounded"></div>
+                    <div class="h-4 skeleton w-4/5 rounded"></div>
+                </div>
+                <div class="h-48 skeleton w-full rounded-2xl my-8"></div>
+                <div class="h-6 skeleton w-1/3 rounded-lg"></div>
+                <div class="space-y-3">
+                    <div class="h-4 skeleton w-full rounded"></div>
+                    <div class="h-4 skeleton w-11/12 rounded"></div>
+                </div>
+            </div>
+
+            <!-- Rendered Markdown Container -->
+            <div id="content" class="prose prose-slate prose-indigo max-w-none hidden prose-headings:font-extrabold prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-pre:bg-slate-900 prose-pre:rounded-2xl prose-pre:border prose-pre:border-slate-800 prose-code:text-rose-500 prose-code:bg-rose-50 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none font-sans">
+            </div>
+        </div>
+    </main>
+
+    <!-- Floating Back to Top Button -->
+    <button id="back-to-top" class="fixed bottom-6 right-6 p-3 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-200/50 hover:bg-indigo-700 transition-all opacity-0 pointer-events-none translate-y-2 duration-300 z-50">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 10l7-7m0 0l7 7m-7-7v18" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    </button>
+
+    <script>
+        // Load Mermaid via ESM
+        let mermaidInstance = null;
+        import('https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs').then(module => {
+            mermaidInstance = module.default;
+            mermaidInstance.initialize({ startOnLoad: false, theme: 'neutral' });
+            renderManual();
+        }).catch(err => {
+            console.error("Failed to load mermaid", err);
+            renderManual();
+        });
+
+        function renderManual() {
+            fetch('/api/readme')
+                .then(res => res.text())
+                .then(text => {
+                    const loader = document.getElementById('loader');
+                    const content = document.getElementById('content');
+                    
+                    // Render markdown using Marked
+                    content.innerHTML = marked.parse(text);
+                    
+                    // Find and render any mermaid code blocks
+                    if (mermaidInstance) {
+                        const elements = content.querySelectorAll('pre code.language-mermaid');
+                        elements.forEach((el, index) => {
+                            const parent = el.parentElement;
+                            const code = el.textContent;
+                            const id = `mermaid-svg-${index}`;
+                            
+                            mermaidInstance.render(id, code).then(({ svg }) => {
+                                parent.outerHTML = `<div class="mermaid-diagram my-8 flex justify-center bg-slate-50 p-6 rounded-2xl border border-slate-100 shadow-inner">${svg}</div>`;
+                            }).catch(err => {
+                                console.error("Mermaid parsing error", err);
+                            });
+                        });
+                    }
+
+                    loader.classList.add('hidden');
+                    content.classList.remove('hidden');
+                })
+                .catch(err => {
+                    document.getElementById('loader').classList.add('hidden');
+                    const content = document.getElementById('content');
+                    content.innerHTML = `
+                        <div class="text-center py-12">
+                            <div class="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-rose-100 text-3xl">⚠️</div>
+                            <h3 class="text-xl font-bold text-slate-800">Failed to load manual</h3>
+                            <p class="text-slate-500 mt-2">Could not read the MANUAL.md file.</p>
+                        </div>
+                    `;
+                    content.classList.remove('hidden');
+                });
+        }
+
+        // Back to top logic
+        const btt = document.getElementById('back-to-top');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 300) {
+                btt.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-2');
+                btt.classList.add('opacity-100', 'translate-y-0');
+            } else {
+                btt.classList.add('opacity-0', 'pointer-events-none', 'translate-y-2');
+                btt.classList.remove('opacity-100', 'translate-y-0');
+            }
+        });
+        btt.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    </script>
+</body>
+</html>
