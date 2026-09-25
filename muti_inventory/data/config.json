@@ -3,17 +3,12 @@
         "host": "0.0.0.0",
         "port": 8000
     },
-    "use_sensor": false,
+    "use_sensor": true,
     "users": [
         {
             "user_id": "ROBOT_01",
             "priority": 1,
             "role": "ROBOT1"
-        },
-        {
-            "user_id": "ROBOT_03",
-            "priority": 1,
-            "role": "ROBOT3"
         },
         {
             "user_id": "operator",
@@ -24,9 +19,15 @@
     "storage": {
         "points": [
             {
-                "point_name": "P-01",
+                "point_name": "SHELF_A:Level 1",
+                "parent_node": "SHELF_A",
+                "level_index": 0,
                 "enabled": true,
-                "allowed_item": [],
+                "allowed_item": [
+                    "box"
+                ],
+                "storage_type": "shelf",
+                "max_capacity": 1,
                 "status": "EMPTY",
                 "items": [],
                 "queue": [],
@@ -36,14 +37,19 @@
                 "out_time": "",
                 "reserved_for": "",
                 "reserved_item_type": "",
-                "reserved_at": ""
+                "reserved_at": "",
+                "strategy": "FIFO"
             },
             {
-                "point_name": "P-02",
+                "point_name": "SHELF_A:Level 2",
+                "parent_node": "SHELF_A",
+                "level_index": 1,
                 "enabled": true,
                 "allowed_item": [
                     "box"
                 ],
+                "storage_type": "shelf",
+                "max_capacity": 1,
                 "status": "FULL",
                 "items": [
                     {
@@ -51,7 +57,7 @@
                         "user_id": "ROBOT_01",
                         "drop_by": "ROBOT_01",
                         "pickup_by": "",
-                        "in_time": "05/08/26 01:46:52",
+                        "in_time": "17/09/26 11:40:29",
                         "note": ""
                     }
                 ],
@@ -62,107 +68,90 @@
                 "out_time": "",
                 "reserved_for": "ROBOT_01",
                 "reserved_item_type": "box",
-                "reserved_at": "05/08/26 01:46:31"
+                "reserved_at": "17/09/26 11:40:28",
+                "strategy": "FIFO"
             },
             {
-                "point_name": "P-03",
+                "point_name": "PALLET:Level 1",
+                "parent_node": "PALLET",
+                "level_index": 0,
                 "enabled": true,
-                "allowed_item": [
-                    "pallet"
-                ],
+                "allowed_item": [],
+                "storage_type": "pallet stacker",
+                "max_capacity": 1,
                 "status": "EMPTY",
                 "items": [],
                 "queue": [],
                 "last_drop_by": "",
                 "last_drop_time": "",
                 "pickup_by": "",
-                "out_time": ""
+                "out_time": "",
+                "reserved_for": "",
+                "reserved_item_type": "",
+                "reserved_at": "",
+                "strategy": "FIFO"
             },
             {
-                "point_name": "P-04",
+                "point_name": "RACK:Level 1",
+                "parent_node": "RACK",
+                "level_index": 0,
                 "enabled": true,
                 "allowed_item": [
-                    "pallet"
+                    "empty pallet"
                 ],
+                "storage_type": "rack",
+                "max_capacity": 1,
+                "status": "EMPTY",
+                "items": [],
+                "queue": [],
+                "last_drop_by": "ROBOT_01",
+                "last_drop_time": "",
+                "pickup_by": "",
+                "out_time": "",
+                "reserved_for": "",
+                "reserved_item_type": "",
+                "reserved_at": "",
+                "strategy": "FIFO"
+            },
+            {
+                "point_name": "RACK:Level 2",
+                "parent_node": "RACK",
+                "level_index": 1,
+                "enabled": true,
+                "allowed_item": [
+                    "empty pallet"
+                ],
+                "storage_type": "rack",
+                "max_capacity": 1,
                 "status": "EMPTY",
                 "items": [],
                 "queue": [],
                 "last_drop_by": "",
                 "last_drop_time": "",
                 "pickup_by": "",
-                "out_time": ""
+                "out_time": "",
+                "reserved_for": "",
+                "reserved_item_type": "",
+                "reserved_at": "",
+                "strategy": "FIFO"
             },
             {
-                "point_name": "P-05",
+                "point_name": "PALLET_A:Level 1",
+                "parent_node": "PALLET_A",
+                "level_index": 0,
                 "enabled": true,
-                "allowed_item": [
-                    "box"
-                ],
-                "status": "EMPTY",
-                "items": [],
-                "queue": [],
-                "last_drop_by": "",
-                "last_drop_time": "",
-                "pickup_by": "",
-                "out_time": ""
-            },
-            {
-                "point_name": "P-06",
-                "enabled": true,
-                "allowed_item": [
-                    "cookie"
-                ],
-                "status": "EMPTY",
-                "items": [],
-                "queue": [],
-                "last_drop_by": "",
-                "last_drop_time": "",
-                "pickup_by": "",
-                "out_time": ""
-            },
-            {
-                "point_name": "P-07",
-                "enabled": true,
-                "allowed_item": [
-                    "wood"
-                ],
-                "status": "EMPTY",
-                "items": [],
-                "queue": [],
-                "last_drop_by": "",
-                "last_drop_time": "",
-                "pickup_by": "",
-                "out_time": ""
-            },
-            {
-                "point_name": "P-08",
-                "enabled": true,
-                "allowed_item": [
-                    "box"
-                ],
-                "status": "EMPTY",
-                "items": [],
-                "queue": [],
-                "last_drop_by": "",
-                "last_drop_time": "",
-                "pickup_by": "",
-                "out_time": ""
-            },
-            {
-                "point_name": "P-09",
-                "enabled": true,
-                "allowed_item": [
-                    "wood"
-                ],
+                "allowed_item": [],
+                "storage_type": "pallet stacker",
+                "max_capacity": 1,
                 "status": "FULL",
                 "items": [
                     {
-                        "item_type": "wood",
+                        "item_type": "cookie",
                         "user_id": "ROBOT_01",
                         "drop_by": "ROBOT_01",
                         "pickup_by": "",
-                        "in_time": "05/08/26 01:46:12",
-                        "note": "nanana"
+                        "in_time": "17/09/26 11:44:01",
+                        "note": ""
                     }
                 ],
                 "queue": [],
@@ -171,35 +160,318 @@
                 "pickup_by": "",
                 "out_time": "",
                 "reserved_for": "ROBOT_01",
-                "reserved_item_type": "wood",
-                "reserved_at": "05/08/26 01:46:01"
+                "reserved_item_type": "cookie",
+                "reserved_at": "17/09/26 11:43:56",
+                "strategy": "FIFO"
             },
             {
-                "point_name": "P-10",
+                "point_name": "PALLET_A:Level 2",
+                "parent_node": "PALLET_A",
+                "level_index": 1,
                 "enabled": true,
-                "allowed_item": [
-                    "cookie"
+                "allowed_item": [],
+                "storage_type": "pallet stacker",
+                "max_capacity": 1,
+                "status": "FULL",
+                "items": [
+                    {
+                        "item_type": "bunny",
+                        "user_id": "ROBOT_01",
+                        "drop_by": "ROBOT_01",
+                        "pickup_by": "",
+                        "in_time": "17/09/26 11:50:43",
+                        "note": ""
+                    }
                 ],
+                "queue": [],
+                "last_drop_by": "ROBOT_01",
+                "last_drop_time": "",
+                "pickup_by": "",
+                "out_time": "",
+                "reserved_for": "ROBOT_01",
+                "reserved_item_type": "bunny",
+                "reserved_at": "17/09/26 11:50:42",
+                "strategy": "FIFO"
+            },
+            {
+                "point_name": "PALLET_A:Level 3",
+                "parent_node": "PALLET_A",
+                "level_index": 2,
+                "enabled": true,
+                "allowed_item": [],
+                "storage_type": "pallet stacker",
+                "max_capacity": 1,
+                "status": "EMPTY",
+                "items": [],
+                "queue": [],
+                "last_drop_by": "ROBOT_01",
+                "last_drop_time": "",
+                "pickup_by": "",
+                "out_time": "",
+                "reserved_for": "",
+                "reserved_item_type": "",
+                "reserved_at": "",
+                "strategy": "FIFO"
+            },
+            {
+                "point_name": "PALLET_A:Level 4",
+                "parent_node": "PALLET_A",
+                "level_index": 3,
+                "enabled": true,
+                "allowed_item": [],
+                "storage_type": "pallet stacker",
+                "max_capacity": 1,
                 "status": "EMPTY",
                 "items": [],
                 "queue": [],
                 "last_drop_by": "",
                 "last_drop_time": "",
                 "pickup_by": "",
-                "out_time": ""
+                "out_time": "",
+                "reserved_for": "",
+                "reserved_item_type": "",
+                "reserved_at": "",
+                "strategy": "FIFO"
+            },
+            {
+                "point_name": "PALLET_A:Level 5",
+                "parent_node": "PALLET_A",
+                "level_index": 4,
+                "enabled": true,
+                "allowed_item": [],
+                "storage_type": "pallet stacker",
+                "max_capacity": 1,
+                "status": "EMPTY",
+                "items": [],
+                "queue": [],
+                "last_drop_by": "",
+                "last_drop_time": "",
+                "pickup_by": "",
+                "out_time": "",
+                "reserved_for": "",
+                "reserved_item_type": "",
+                "reserved_at": "",
+                "strategy": "FIFO"
+            },
+            {
+                "point_name": "SKIT_POINT:Level 1",
+                "parent_node": "SKIT_POINT",
+                "level_index": 0,
+                "enabled": true,
+                "allowed_item": [
+                    "motor drive"
+                ],
+                "storage_type": "skit",
+                "max_capacity": 1,
+                "status": "FULL",
+                "items": [
+                    {
+                        "item_type": "motor drive",
+                        "user_id": "ROBOT_01",
+                        "drop_by": "ROBOT_01",
+                        "pickup_by": "",
+                        "in_time": "17/09/26 09:51:25",
+                        "note": ""
+                    }
+                ],
+                "queue": [],
+                "last_drop_by": "ROBOT_01",
+                "last_drop_time": "",
+                "pickup_by": "",
+                "out_time": "",
+                "reserved_for": "ROBOT_01",
+                "reserved_item_type": "motor drive",
+                "reserved_at": "17/09/26 09:51:23",
+                "strategy": "FIFO"
+            },
+            {
+                "point_name": "SKIT_POINT:Level 2",
+                "parent_node": "SKIT_POINT",
+                "level_index": 1,
+                "enabled": true,
+                "allowed_item": [
+                    "motor drive"
+                ],
+                "storage_type": "skit",
+                "max_capacity": 1,
+                "status": "FULL",
+                "items": [
+                    {
+                        "item_type": "motor drive",
+                        "user_id": "ROBOT_01",
+                        "drop_by": "ROBOT_01",
+                        "pickup_by": "",
+                        "in_time": "17/09/26 10:17:53",
+                        "note": ""
+                    }
+                ],
+                "queue": [],
+                "last_drop_by": "ROBOT_01",
+                "last_drop_time": "",
+                "pickup_by": "",
+                "out_time": "",
+                "reserved_for": "ROBOT_01",
+                "reserved_item_type": "motor drive",
+                "reserved_at": "17/09/26 10:17:52",
+                "strategy": "FIFO"
+            },
+            {
+                "point_name": "SKIT_POINT:Level 3",
+                "parent_node": "SKIT_POINT",
+                "level_index": 2,
+                "enabled": true,
+                "allowed_item": [
+                    "motor drive"
+                ],
+                "storage_type": "skit",
+                "max_capacity": 1,
+                "status": "FULL",
+                "items": [
+                    {
+                        "item_type": "motor drive",
+                        "user_id": "ROBOT_01",
+                        "drop_by": "ROBOT_01",
+                        "pickup_by": "",
+                        "in_time": "17/09/26 10:17:57",
+                        "note": ""
+                    }
+                ],
+                "queue": [],
+                "last_drop_by": "ROBOT_01",
+                "last_drop_time": "",
+                "pickup_by": "",
+                "out_time": "",
+                "reserved_for": "ROBOT_01",
+                "reserved_item_type": "motor drive",
+                "reserved_at": "17/09/26 10:17:57",
+                "strategy": "FIFO"
+            },
+            {
+                "point_name": "SKIT_POINT:Level 4",
+                "parent_node": "SKIT_POINT",
+                "level_index": 3,
+                "enabled": true,
+                "allowed_item": [
+                    "motor drive"
+                ],
+                "storage_type": "skit",
+                "max_capacity": 1,
+                "status": "EMPTY",
+                "items": [],
+                "queue": [],
+                "last_drop_by": "ROBOT_01",
+                "last_drop_time": "",
+                "pickup_by": "",
+                "out_time": "",
+                "reserved_for": "",
+                "reserved_item_type": "",
+                "strategy": "FIFO",
+                "reserved_at": ""
             }
         ]
     },
     "sensor_mapping": {
-        "S1": "P-01",
-        "S2": "P-02",
-        "S3": "P-03",
-        "S4": "P-04",
-        "S5": "P-05",
-        "S6": "P-06",
-        "S7": "P-07",
-        "S8": "P-08",
-        "S9": "P-09",
-        "S10": "P-10"
-    }
+        "S_P-01_1": "P-01:Level 1",
+        "S_P-01_2": "P-01:Level 2",
+        "S_SHELF_A_1": "SHELF_A:Level 1",
+        "S_SHELF_A_2": "SHELF_A:Level 2",
+        "S_PALLET_1": "PALLET:Level 1",
+        "S_RACK_1": "RACK:Level 1",
+        "S_P-01:Level 1_1": "P-01:Level 1:Level 1",
+        "S_P-01:Level 2_1": "P-01:Level 2:Level 1",
+        "S_SHELF_A:Level 1_1": "SHELF_A:Level 1:Level 1",
+        "S_SHELF_A:Level 2_1": "SHELF_A:Level 2:Level 1",
+        "S_PALLET:Level 1_1": "PALLET:Level 1:Level 1",
+        "S_RACK:Level 1_1": "RACK:Level 1:Level 1",
+        "S_P-01:Level 3_1": "P-01:Level 3:Level 1",
+        "S_P-01:Level 4_1": "P-01:Level 4:Level 1",
+        "S_P-01:Level 5_1": "P-01:Level 5:Level 1",
+        "S_RACK:Level 2_1": "RACK:Level 2:Level 1",
+        "S_PALLET_A:Level 1_1": "PALLET_A:Level 1:Level 1",
+        "S_PALLET_A:Level 2_1": "PALLET_A:Level 2:Level 1",
+        "S_PALLET_A:Level 3_1": "PALLET_A:Level 3:Level 1",
+        "S_PALLET_A:Level 4_1": "PALLET_A:Level 4:Level 1",
+        "S_PALLET_A:Level 5_1": "PALLET_A:Level 5:Level 1",
+        "S_SKIT_POINT:Level 1_1": "SKIT_POINT:Level 1:Level 1",
+        "S_SKIT_POINT:Level 2_1": "SKIT_POINT:Level 2:Level 1",
+        "S_SKIT_POINT:Level 3_1": "SKIT_POINT:Level 3:Level 1",
+        "S_SKIT_POINT:Level 4_1": "SKIT_POINT:Level 4:Level 1"
+    },
+    "pickup_strategy": "FIFO",
+    "item_types": [
+        {
+            "name": "cookie"
+        },
+        {
+            "name": "box"
+        },
+        {
+            "name": "empty pallet"
+        },
+        {
+            "name": "toy"
+        },
+        {
+            "name": "motor drive"
+        },
+        {
+            "name": "bunny"
+        }
+    ],
+    "map_layout": {
+        "P-01": {
+            "x": 15,
+            "y": 5
+        },
+        "RACK": {
+            "x": 10,
+            "y": 2
+        },
+        "PALLET": {
+            "x": 9,
+            "y": 8
+        },
+        "SHELF_A": {
+            "x": 6,
+            "y": 1
+        },
+        "PALLET_A": {
+            "x": 10,
+            "y": 4
+        },
+        "SKIT_POINT": {
+            "x": 5,
+            "y": 5
+        }
+    },
+    "map_size": {
+        "width": 10,
+        "height": 10
+    },
+    "storage_types": [
+        {
+            "name": "pallet stacker",
+            "strategy": "LIFO"
+        },
+        {
+            "name": "rack",
+            "strategy": "FIFO"
+        },
+        {
+            "name": "shelf",
+            "strategy": "FIFO"
+        },
+        {
+            "name": "box",
+            "strategy": "LIFO"
+        },
+        {
+            "name": "cart",
+            "strategy": "FIFO"
+        },
+        {
+            "name": "skit",
+            "strategy": "LIFO"
+        }
+    ]
 }

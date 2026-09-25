@@ -70,6 +70,18 @@
             0% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
         }
+
+        /* Fix code block styling */
+        pre {
+            background-color: #0f172a !important; /* slate-900 */
+            color: #ffffff !important;
+        }
+        pre code {
+            background-color: transparent !important;
+            color: inherit !important;
+            padding: 0 !important;
+            font-size: 0.9em;
+        }
     </style>
 </head>
 <body class="text-slate-800 antialiased selection:bg-indigo-100 min-h-screen pb-16">
@@ -84,14 +96,49 @@
                 <p class="text-slate-400 text-sm mt-1.5 font-medium">Inventory Control System & API Reference</p>
             </div>
             <div class="flex items-center gap-3">
-                <span class="text-xs text-indigo-200/70 bg-indigo-950/60 px-3.5 py-2 rounded-xl border border-indigo-800/40 font-mono font-medium">v1.2.0</span>
+                <span class="text-xs text-indigo-200/70 bg-indigo-950/60 px-3.5 py-2 rounded-xl border border-indigo-800/40 font-mono font-medium">v1.3.0</span>
             </div>
         </div>
     </header>
 
     <!-- Main Content Container -->
-    <main class="max-w-4xl mx-auto px-4 md:px-0">
-        <div class="bg-white p-8 md:p-12 rounded-3xl shadow-xl shadow-slate-100/50 border border-slate-200/80 animate-slide-up relative">
+    <!-- TOC Drawer Overlay -->
+    <div id="toc-overlay" onclick="toggleTOC()" class="fixed inset-0 bg-slate-900/20 z-40 hidden backdrop-blur-sm transition-opacity opacity-0 duration-300"></div>
+
+    <!-- TOC Drawer Sidebar -->
+    <aside id="toc-drawer" class="fixed top-0 left-0 h-full w-80 bg-white shadow-2xl z-50 transform -translate-x-full transition-transform duration-300 flex flex-col">
+        <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+            <h3 class="font-black text-slate-800 text-sm tracking-wider uppercase flex items-center gap-2">
+                <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
+                Contents
+            </h3>
+            <button onclick="toggleTOC()" class="text-slate-400 hover:text-rose-500 transition p-1">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div class="p-6 overflow-y-auto custom-scrollbar flex-1">
+            <ul id="toc-list" class="space-y-3 text-sm">
+                <li class="text-slate-400 italic text-xs">Loading contents...</li>
+            </ul>
+        </div>
+    </aside>
+
+    <!-- TOC Toggle Floating Button -->
+    <button onclick="toggleTOC()" class="fixed top-[20%] lg:top-1/3 left-0 z-30 bg-white border border-l-0 border-slate-200 text-indigo-600 px-2 py-4 rounded-r-xl shadow-lg hover:bg-indigo-50 hover:text-indigo-700 transition flex flex-col items-center gap-2 group">
+        <svg class="w-5 h-5 group-hover:scale-110 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
+        <span class="text-[10px] font-black uppercase tracking-widest mt-1" style="writing-mode: vertical-rl; transform: rotate(180deg);">Contents</span>
+    </button>
+
+    <!-- Main Content Container -->
+    <main class="max-w-4xl mx-auto px-4 md:px-0 mb-20">
+            
+            <!-- Tabs -->
+            <div class="flex flex-wrap gap-1 mb-0 relative z-20 top-[1px]">
+                <button id="tab-ui" onclick="switchTab('ui')" class="px-6 py-3.5 rounded-t-2xl font-black transition-colors bg-white text-indigo-600 border-t border-x border-slate-200/80 border-b border-b-white">User Interface (UI) Guide</button>
+                <button id="tab-api" onclick="switchTab('api')" class="px-6 py-3.5 rounded-t-2xl font-bold transition-colors bg-slate-100 text-slate-500 hover:bg-slate-50 hover:text-indigo-400 border border-transparent border-b-slate-200/80">API & Headless Operations</button>
+            </div>
+
+        <div class="bg-white p-8 md:p-12 rounded-b-3xl rounded-tr-3xl shadow-xl shadow-slate-100/50 border border-slate-200/80 animate-slide-up relative z-10">
             
             <!-- Skeleton Loader -->
             <div id="loader" class="space-y-6 py-6">
@@ -110,7 +157,7 @@
             </div>
 
             <!-- Rendered Markdown Container -->
-            <div id="content" class="prose prose-slate prose-indigo max-w-none hidden prose-headings:font-extrabold prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-pre:bg-slate-900 prose-pre:rounded-2xl prose-pre:border prose-pre:border-slate-800 prose-code:text-rose-500 prose-code:bg-rose-50 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none font-sans">
+            <div id="content" class="prose prose-slate prose-indigo max-w-none hidden prose-headings:font-extrabold prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-pre:bg-slate-900 prose-pre:rounded-2xl prose-pre:border prose-pre:border-slate-800 prose-code:text-indigo-600 prose-code:bg-indigo-50 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none font-sans">
             </div>
         </div>
     </main>
@@ -121,45 +168,119 @@
     </button>
 
     <script>
+        let fullMarkdownText = "";
+
+        function toggleTOC() {
+            const drawer = document.getElementById('toc-drawer');
+            const overlay = document.getElementById('toc-overlay');
+            const isOpen = !drawer.classList.contains('-translate-x-full');
+            
+            if (isOpen) {
+                drawer.classList.add('-translate-x-full');
+                overlay.classList.remove('opacity-100');
+                overlay.classList.add('opacity-0');
+                setTimeout(() => overlay.classList.add('hidden'), 300);
+            } else {
+                overlay.classList.remove('hidden');
+                setTimeout(() => {
+                    overlay.classList.remove('opacity-0');
+                    overlay.classList.add('opacity-100');
+                    drawer.classList.remove('-translate-x-full');
+                }, 10);
+            }
+        }
+
         // Load Mermaid via ESM
         let mermaidInstance = null;
         import('https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs').then(module => {
             mermaidInstance = module.default;
             mermaidInstance.initialize({ startOnLoad: false, theme: 'neutral' });
-            renderManual();
+            fetchManual();
         }).catch(err => {
             console.error("Failed to load mermaid", err);
-            renderManual();
+            fetchManual();
         });
 
-        function renderManual() {
+        function switchTab(tab) {
+            const tabUi = document.getElementById('tab-ui');
+            const tabApi = document.getElementById('tab-api');
+            
+            if (tab === 'ui') {
+                tabUi.className = "px-6 py-3.5 rounded-t-2xl font-black transition-colors bg-white text-indigo-600 border-t border-x border-slate-200/80 border-b border-b-white";
+                tabApi.className = "px-6 py-3.5 rounded-t-2xl font-bold transition-colors bg-slate-100 text-slate-500 hover:bg-slate-50 hover:text-indigo-400 border border-transparent border-b-slate-200/80";
+            } else {
+                tabApi.className = "px-6 py-3.5 rounded-t-2xl font-black transition-colors bg-white text-indigo-600 border-t border-x border-slate-200/80 border-b border-b-white";
+                tabUi.className = "px-6 py-3.5 rounded-t-2xl font-bold transition-colors bg-slate-100 text-slate-500 hover:bg-slate-50 hover:text-indigo-400 border border-transparent border-b-slate-200/80";
+            }
+
+            const splitString = "## 📡 Headless Operation (API Integration)";
+            const parts = fullMarkdownText.split(splitString);
+            let textToRender = "";
+            
+            if (tab === 'ui') {
+                textToRender = parts[0];
+            } else {
+                textToRender = splitString + "\n" + (parts[1] || "\n\n*API documentation not found.*");
+            }
+
+            renderMarkdownText(textToRender);
+        }
+
+        function renderMarkdownText(text) {
+            const content = document.getElementById('content');
+            content.innerHTML = marked.parse(text);
+            
+            // Build Table of Contents dynamically
+            const tocList = document.getElementById('toc-list');
+            if (tocList) {
+                tocList.innerHTML = '';
+                const headers = content.querySelectorAll('h2, h3');
+                if (headers.length === 0) {
+                    tocList.innerHTML = '<li class="text-slate-400 italic text-xs">No headers found.</li>';
+                }
+                headers.forEach((header, index) => {
+                    if (!header.id) header.id = `header-${index}`;
+                    
+                    const isH2 = header.tagName.toLowerCase() === 'h2';
+                    const li = document.createElement('li');
+                    li.className = isH2 ? 'font-bold text-slate-700 mt-4 mb-1' : 'ml-4 text-slate-500 hover:text-indigo-600 transition-colors';
+                    
+                    const a = document.createElement('a');
+                    a.href = `#${header.id}`;
+                    a.textContent = header.textContent;
+                    a.className = "block truncate";
+                    a.title = header.textContent; // Tooltip for truncated text
+                    a.onclick = () => { toggleTOC(); }; // Close drawer on click
+                    
+                    li.appendChild(a);
+                    tocList.appendChild(li);
+                });
+            }
+
+            if (mermaidInstance) {
+                const elements = content.querySelectorAll('pre code.language-mermaid');
+                elements.forEach((el, index) => {
+                    const parent = el.parentElement;
+                    const code = el.textContent;
+                    const id = `mermaid-svg-${index}`;
+                    
+                    mermaidInstance.render(id, code).then(({ svg }) => {
+                        parent.outerHTML = `<div class="mermaid-diagram my-8 flex justify-center bg-slate-50 p-6 rounded-2xl border border-slate-100 shadow-inner">${svg}</div>`;
+                    }).catch(err => console.error(err));
+                });
+            }
+        }
+
+        function fetchManual() {
             fetch('/api/readme')
                 .then(res => res.text())
                 .then(text => {
+                    fullMarkdownText = text;
                     const loader = document.getElementById('loader');
-                    const content = document.getElementById('content');
-                    
-                    // Render markdown using Marked
-                    content.innerHTML = marked.parse(text);
-                    
-                    // Find and render any mermaid code blocks
-                    if (mermaidInstance) {
-                        const elements = content.querySelectorAll('pre code.language-mermaid');
-                        elements.forEach((el, index) => {
-                            const parent = el.parentElement;
-                            const code = el.textContent;
-                            const id = `mermaid-svg-${index}`;
-                            
-                            mermaidInstance.render(id, code).then(({ svg }) => {
-                                parent.outerHTML = `<div class="mermaid-diagram my-8 flex justify-center bg-slate-50 p-6 rounded-2xl border border-slate-100 shadow-inner">${svg}</div>`;
-                            }).catch(err => {
-                                console.error("Mermaid parsing error", err);
-                            });
-                        });
-                    }
-
                     loader.classList.add('hidden');
-                    content.classList.remove('hidden');
+                    document.getElementById('content').classList.remove('hidden');
+                    
+                    switchTab('ui');
                 })
                 .catch(err => {
                     document.getElementById('loader').classList.add('hidden');

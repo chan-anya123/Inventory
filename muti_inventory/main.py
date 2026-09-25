@@ -50,7 +50,7 @@ def sort_queue(q_list):
     return sorted(q_list, key=lambda x: (get_user_priority(x["user_id"]), x.get("request_time", "")))
 
 def reset_slot_data(s):
-    s.update({"status": SlotState.EMPTY.value, "items": [], "queue": [], "out_time": "", "pickup_by": "", 
+    s.update({"items": [], "queue": [], "out_time": "", "pickup_by": "", 
               "last_drop_by": "", "last_drop_time": "", "reserved_for": "", "reserved_item_type": "", "reserved_at": ""})
 
 # --- INITIALIZATION ---
@@ -69,6 +69,21 @@ def add_history(action, user_id, point, item, note=""):
         writer.writerow([action, user_id, point, item, record_time, note])
 
 with open(CONFIG_FILE, "r", encoding="utf-8") as f: config = json.load(f)
+
+# --- MIGRATION: unit_type -> storage_type ---
+migrated = False
+if "unit_types" in config and "storage_types" not in config:
+    config["storage_types"] = config.pop("unit_types")
+    migrated = True
+for slot in config.get("storage", {}).get("points", []):
+    if "unit_type" in slot:
+        slot["storage_type"] = slot.pop("unit_type")
+        migrated = True
+if migrated:
+    tmp = CONFIG_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f: json.dump(config, f, indent=4, ensure_ascii=False)
+    os.replace(tmp, CONFIG_FILE)
+
 slots, users_db, sensor_mapping = config["storage"]["points"], config["users"], config.get("sensor_mapping", {})
 latest_sensors_cache = {s: False for s in sensor_mapping.keys()}
 lock = threading.Lock()
@@ -104,7 +119,9 @@ def sensor_monitor():
                                              "items": [{"item_type": nxt["item_type"], "user_id": nxt["user_id"], "drop_by": nxt["user_id"], 
                                                        "pickup_by": "", "in_time": now_ts(), "note": nxt.get("note", "")}]})
                                 add_history("DROP_REQUEST", nxt["user_id"], slot["point_name"], nxt["item_type"], nxt.get("note", ""))
-                            else: reset_slot_data(slot)
+                            else:
+                                reset_slot_data(slot)
+                                slot["status"] = SlotState.EMPTY.value
                             slot["queue"] = q
                             save_config()
         except Exception as e: print(f"Monitor Error: {e}")
@@ -147,21 +164,50 @@ def get_manual():
         return f.read()
 
 @app.get("/slots")
-def get_slots(): return {"slots": slots, "users": users_db, "use_sensor": config.get("use_sensor", True), "version": CONFIG_VERSION}
+def get_slots(): return {"slots": slots, "users": users_db, "use_sensor": config.get("use_sensor", True),
+        "pickup_strategy": config.get("pickup_strategy", "FIFO"),
+        "storage_types": config.get("storage_types", []),
+        "item_types": config.get("item_types", [{"name": "*"}, {"name": "cookie"}]),
+        "sensor_mapping": config.get("sensor_mapping", {}),
+        "map_layout": config.get("map_layout", {}),
+        "map_size": config.get("map_size", {"width": 10, "height": 10}),
+        "version": CONFIG_VERSION}
 
 @app.post("/slot/suggest")
 def suggest(req: dict):
     with lock:
         item = req.get("item_type", "").strip()
         if not item: raise HTTPException(400, "Item empty")
-        m = []
+        storage_types_map = {u["name"]: u.get("strategy", "FIFO") for u in config.get("storage_types", [])}
+        
+        candidates = []
         for s in slots:
             if not s.get("enabled", True) or s.get("status") != SlotState.EMPTY.value: continue
             a = s.get("allowed_item") or []
-            if item in a: m.append({"point_name": s["point_name"], "priority": 1, "action_type": "MATCH"})
-            elif not a or "*" in a: m.append({"point_name": s["point_name"], "priority": 2, "action_type": "ANY"})
+            if item in a: candidates.append((s, 1, "MATCH"))
+            elif not a or "*" in a: candidates.append((s, 2, "ANY"))
+            
+        grouped = {}
+        for s, prio, act in candidates:
+            p_node = s.get("parent_node") or s["point_name"].split(':')[0]
+            grouped.setdefault(p_node, []).append((s, prio, act))
+            
+        m = []
+        for p_node, group in grouped.items():
+            if not group: continue
+            u_type = group[0][0].get("storage_type", "")
+            strat = storage_types_map.get(u_type, "FIFO")
+            
+            if strat == "LIFO":
+                # Only keep the lowest level index for LIFO nodes
+                group.sort(key=lambda x: x[0].get("level_index", 0))
+                m.append({"point_name": group[0][0]["point_name"], "priority": group[0][1], "action_type": group[0][2]})
+            else:
+                for s, prio, act in group:
+                    m.append({"point_name": s["point_name"], "priority": prio, "action_type": act})
+                    
         if not m: raise HTTPException(404, "No slots")
-        return {"slots": sorted(m, key=lambda x: x["priority"])}
+        return {"slots": sorted(m, key=lambda x: (x["priority"], x["point_name"]))}
 
 @app.post("/slot/drop")
 def drop(req: dict):
@@ -205,30 +251,93 @@ def drop(req: dict):
                       "items": [{"item_type": item_type, "user_id": user_id, "drop_by": user_id, "pickup_by": "", "in_time": now_ts(), "note": note}]})
             add_history("DROP_REQUEST", user_id, point_name, item_type, note); save_config(); return {"status": "RESERVED"}
 
-@app.post("/item/pickup")
-def pickup(req: dict):
+@app.post("/slot/pickup")
+def pickup_slot(req: dict):
     with lock:
-        item_type = req.get("item_type")
+        point_name = req.get("point_name")
         user_id = req.get("user_id")
-        c = [s for s in slots if s.get("enabled", True) and s["status"] == SlotState.FULL.value and s.get("items") and s["items"][0]["item_type"] == item_type]
-        if not c: raise HTTPException(404, "Stock not found")
-        t = sorted(c, key=lambda x: x["items"][0].get("in_time", ""))[0]
+        
+        t = find_slot(point_name)
+        if not t or t["status"] != SlotState.FULL.value:
+            raise HTTPException(404, "Target level is empty or invalid")
+            
         t.update({"status": SlotState.PICKUP_RESERVED.value, "pickup_by": user_id, "out_time": now_ts()})
         dispatched_item = t["items"][0] if t.get("items") else {}
-        add_history("PICKUP_REQUEST", user_id, t["point_name"], item_type)
+        add_history("PICKUP_REQUEST", user_id, t["point_name"], dispatched_item.get("item_type", ""))
         save_config()
         return {"status": "PICKUP_RESERVED", "target_slot": t["point_name"], "dispatched_item": dispatched_item}
+
+@app.post("/slot/cancel")
+def cancel_task(req: dict):
+    with lock:
+        s = find_slot(req.get("point_name"))
+        if not s: raise HTTPException(400, "Invalid slot")
+        
+        stat = s.get("status")
+        
+        # Reset task specific data
+        s.update({
+            "queue": [],
+            "pickup_by": "",
+            "out_time": "",
+            "reserved_for": "",
+            "reserved_item_type": "",
+            "reserved_at": ""
+        })
+        
+        # In Manual Mode:
+        # If cancelling a DROP, the item wasn't actually placed yet, so we must remove it.
+        # If cancelling a PICKUP, the item is still there, so we keep it.
+        if not config.get("use_sensor", True):
+            if stat == SlotState.DROP_RESERVED.value:
+                s["status"] = SlotState.EMPTY.value
+                s["items"] = []
+            elif stat == SlotState.PICKUP_RESERVED.value:
+                s["status"] = SlotState.FULL.value
+            # If it's already EMPTY or FULL, we don't touch the status.
+        else:
+            # In Auto Mode:
+            # Status always follows the sensor
+            sensor_id = None
+            for sid, target in config.get("sensor_mapping", {}).items():
+                if target == s["point_name"]:
+                    sensor_id = sid
+                    break
+            
+            is_on = latest_sensors_cache.get(sensor_id, False) if sensor_id else False
+            if is_on:
+                s["status"] = SlotState.FULL.value
+            else:
+                s["status"] = SlotState.EMPTY.value
+                s["items"] = []
+                
+        save_config()
+        return {"message": "Cancelled and reset successfully"}
 
 @app.post("/slot/reset")
 def reset(req: dict):
     with lock:
         s = find_slot(req.get("point_name"))
-        if s: reset_slot_data(s); save_config()
+        if s:
+            reset_slot_data(s)
+            if config.get("use_sensor", True):
+                sid = next((k for k, v in sensor_mapping.items() if v == s["point_name"]), None)
+                if sid:
+                    s["status"] = SlotState.FULL.value if latest_sensors_cache.get(sid, False) else SlotState.EMPTY.value
+                else:
+                    s["status"] = SlotState.EMPTY.value
+            else:
+                requested = req.get("status", "").strip().upper()
+                s["status"] = requested if requested in [SlotState.EMPTY.value, SlotState.FULL.value] else SlotState.EMPTY.value
+            save_config()
         return {"message": "Reset"}
 
 @app.post("/slot/confirm")
 def confirm(req: dict):
     with lock:
+        if config.get("use_sensor", True):
+            raise HTTPException(400, "Cannot manually confirm while in Auto Mode (Sensors Enabled). Please use physical sensors.")
+            
         point_name = req.get("point_name")
         slot = find_slot(point_name)
         if not slot: raise HTTPException(400, "Invalid slot")
@@ -314,41 +423,87 @@ def update_c(payload: dict):
     with lock:
         config["users"] = payload.get("users", [])
         new_slots = payload.get("slots", [])
-        config["storage"]["points"] = new_slots
-        config["use_sensor"] = payload.get("use_sensor", True)
         
-        # Auto-update sensor mapping for new slots
+        old_slots_map = {s["point_name"].strip().lower(): s for s in slots}
+        processed_slots = []
+        
+        for slot in new_slots:
+            name = slot.get("point_name", "").strip()
+            if not name: continue
+            
+            old_s = old_slots_map.get(name.lower())
+            if old_s:
+                slot["items"] = old_s.get("items", [])
+                slot["queue"] = old_s.get("queue", [])
+                slot["status"] = old_s.get("status", "EMPTY")
+                
+                for k in ["last_drop_by", "last_drop_time", "pickup_by", "out_time", "reserved_for", "reserved_item_type", "reserved_quantity", "reserved_at", "pending_drop", "pending_pickup_item"]:
+                    if k in old_s:
+                        slot[k] = old_s[k]
+            else:
+                slot.setdefault("items", [])
+                slot.setdefault("queue", [])
+                slot.setdefault("status", "EMPTY")
+            slot["strategy"] = slot.get("strategy", "FIFO")
+            
+            slot["enabled"] = slot.get("enabled", True)
+            slot["max_capacity"] = max(1, int(slot.get("max_capacity", 1)))
+            processed_slots.append(slot)
+            
+        config["storage"]["points"] = processed_slots
+        config["use_sensor"] = payload.get("use_sensor", True)
+        config["pickup_strategy"] = payload.get("pickup_strategy", "FIFO")
+        config["storage_types"] = payload.get("storage_types", [])
+        config["item_types"] = payload.get("item_types", [])
+        if "map_layout" in payload:
+            config["map_layout"] = payload.get("map_layout", {})
+        if "map_size" in payload:
+            config["map_size"] = payload.get("map_size", {"width": 10, "height": 10})
+        
         if "sensor_mapping" not in config:
             config["sensor_mapping"] = {}
             
-        current_mapped_slots = set(config["sensor_mapping"].values())
-        for slot in new_slots:
+        current_mapped_targets = set(config["sensor_mapping"].values())
+        for slot in processed_slots:
             name = slot.get("point_name")
-            if name and name not in current_mapped_slots:
-                # Generate a sensor name: if "P-07", extract digits (7) and prefix with 'S' -> "S7"
-                digits = "".join(filter(str.isdigit, name))
-                if digits:
-                    sensor_id = f"S{int(digits)}"
-                else:
-                    sensor_id = f"S_{name}"
-                
-                # Ensure the generated sensor ID is unique
-                while sensor_id in config["sensor_mapping"]:
-                    sensor_id += "_"
-                    
-                config["sensor_mapping"][sensor_id] = name
+            if not name: continue
+            levels = slot.get("levels", [])
+            if not levels: levels = [{"level_name": "Level 1"}]
+            
+            for i, lvl in enumerate(levels):
+                target = f"{name}:{lvl.get('level_name', f'Level {i+1}')}"
+                if target not in current_mapped_targets:
+                    sensor_id = f"S_{name}_{i+1}"
+                    while sensor_id in config["sensor_mapping"]:
+                        sensor_id += "_"
+                    config["sensor_mapping"][sensor_id] = target
                 
         users_db = config["users"]
         slots = config["storage"]["points"]
         sensor_mapping = config.get("sensor_mapping", {})
         
-        # Update latest_sensors_cache to include any new sensors
         for sid in sensor_mapping.keys():
             if sid not in latest_sensors_cache:
                 latest_sensors_cache[sid] = False
                 
         save_config()
-        return {"status": "OK"}
+
+@app.post("/config/mode")
+def update_mode(req: dict):
+    with lock:
+        if "use_sensor" in req:
+            config["use_sensor"] = bool(req["use_sensor"])
+            save_config()
+            return {"message": f"Mode updated to {'Auto (Sensor)' if config['use_sensor'] else 'Manual'}"}
+        raise HTTPException(400, "Missing 'use_sensor' boolean in payload")
+
+@app.post("/config/map")
+def update_map(payload: dict):
+    with lock:
+        config["map_layout"] = payload.get("map_layout", {})
+        config["map_size"] = payload.get("map_size", {"width": 10, "height": 10})
+        save_config()
+        return {"status": "OK", "version": CONFIG_VERSION}
 
 @app.get("/history")
 def get_h(limit: int = 100):
@@ -369,6 +524,28 @@ def receive_s(data: dict):
 @app.get("/sensor/status")
 def sensor_s():
     with lock: return latest_sensors_cache
+
+
+@app.post("/slot/manual-status")
+def manual_status(req: dict):
+    with lock:
+        point_name = req.get("point_name", "").strip()
+        status = req.get("status", "").strip().upper()
+
+        slot = find_slot(point_name)
+        if not slot:
+            raise HTTPException(404, "Slot not found")
+
+        valid_status = ["EMPTY", "PARTIAL", "DROP_RESERVED", "FULL", "PICKUP_RESERVED"]
+        if status not in valid_status:
+            raise HTTPException(400, f"Invalid status. Allowed: {valid_status}")
+
+        old_status = slot.get("status", "")
+        reset_slot_data(slot)
+        slot["status"] = status
+        add_history("MANUAL_STATUS", "manual", point_name, "", f"{old_status} -> {status}")
+        save_config()
+        return {"status": "OK", "point_name": point_name, "old_status": old_status, "new_status": status}
 
 if __name__ == "__main__": 
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

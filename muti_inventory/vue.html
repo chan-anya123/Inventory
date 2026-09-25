@@ -179,6 +179,13 @@
             font-style: italic;
             margin: 1rem 0;
         }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slide-up {
+            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
     </style>
 </head>
 
@@ -187,6 +194,24 @@
 <div id="app" class="flex w-full h-screen">
     <div v-if="toast.show" class="toast" :style="{ borderLeft: toast.ok ? '6px solid #86efac' : '6px solid #fda4af' }">
         <span v-text="toast.msg"></span>
+    </div>
+
+    <!-- Reset Modal -->
+    <div v-if="resetModal.show" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div class="bg-white rounded-3xl shadow-xl w-[400px] overflow-hidden border border-slate-100 p-8 text-center animate-slide-up">
+            <h3 class="text-2xl font-black text-slate-800 mb-2">Emergency Reset</h3>
+            <p class="text-slate-500 font-medium mb-6">Select the new physical status for <span class="font-bold text-rose-500">{{ resetModal.pointName }}</span>.</p>
+            
+            <select v-model="resetModal.status" class="w-full p-4 input-pastel rounded-xl text-lg font-bold cursor-pointer text-center mb-8 border border-slate-200 focus:border-indigo-400">
+                <option value="EMPTY">EMPTY (ว่าง)</option>
+                <option value="FULL">FULL (เต็ม)</option>
+            </select>
+            
+            <div class="flex gap-4">
+                <button @click="resetModal.show = false" class="w-1/2 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition">Cancel</button>
+                <button @click="executeReset(resetModal.pointName, resetModal.status)" class="w-1/2 py-3.5 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-xl shadow-md transition">Confirm Reset</button>
+            </div>
+        </div>
     </div>
 
     <aside class="w-64 bg-white border-r border-slate-200 flex flex-col h-screen shadow-sm z-10">
@@ -232,7 +257,7 @@
             <div class="flex justify-between items-end mb-8">
                 <div>
                     <h1 class="text-3xl font-black tracking-tight text-slate-700">Control Dashboard</h1>
-                    <p class="text-slate-500 text-sm mt-1 font-medium">Real-time storage monitoring and FIFO management</p>
+                    <p class="text-slate-500 text-sm mt-1 font-medium">storage monitoring management</p>
                 </div>
                 <div class="bg-white px-6 py-4 rounded-2xl shadow-sm border border-slate-300 flex items-center gap-6">
                     <div class="text-left border-r pr-6 border-slate-100">
@@ -266,7 +291,10 @@
                         <div class="grid grid-cols-[1fr_auto] gap-3 items-end">
                             <div>
                                 <label class="text-xs text-slate-500 font-bold block mb-1.5">Item Type</label>
-                                <input v-model="formDrop.item_type" class="w-full p-3 input-pastel rounded-xl text-sm font-semibold" placeholder="e.g. cookie, box">
+                                <select v-model="formDrop.item_type" class="w-full p-3 input-pastel rounded-xl text-sm font-semibold cursor-pointer">
+                                    <option value="" disabled>Select Item Type</option>
+                                    <option v-for="it in configItemTypes" :key="it.name" :value="it.name">{{ it.name }}</option>
+                                </select>
                             </div>
                             <button @click="handleScanAndFill" class="bg-rose-100 text-rose-600 border border-rose-200 h-[46px] px-6 rounded-xl font-black hover:bg-rose-200 transition text-sm flex items-center justify-center">
                                 FIND STORAGE
@@ -301,9 +329,26 @@
                             </div>
                         </div>
                     </div>
-                    <button @click="dropItem" class="w-full bg-indigo-500 text-white p-3.5 rounded-xl font-bold hover:bg-indigo-600 transition text-sm tracking-wide shadow-md shadow-indigo-200 mt-5">
-                        CONFIRM DROP
-                    </button>
+                    <template v-if="slots.find(s => s.point_name === formDrop.point_name)?.status === 'DROP_RESERVED'">
+                        <div class="flex flex-col gap-3 mt-5">
+                            <div v-if="useSensor" class="bg-indigo-50 border border-indigo-100 text-indigo-700 p-4 rounded-xl text-center text-sm font-bold shadow-inner">
+                                <span class="animate-pulse">Waiting for physical item placement...</span>
+                            </div>
+                            <div class="flex gap-3">
+                                <button v-if="!useSensor" @click="confirmSlot(formDrop.point_name)" class="flex-1 bg-emerald-500 text-white p-3.5 rounded-xl font-bold hover:bg-emerald-600 transition text-sm shadow-md shadow-emerald-200 tracking-wide">
+                                    CONFIRM
+                                </button>
+                                <button @click="cancelTask(formDrop.point_name)" class="flex-1 bg-rose-500 text-white p-3.5 rounded-xl font-bold hover:bg-rose-600 transition text-sm shadow-md shadow-rose-200 tracking-wide">
+                                    CANCEL
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                    <template v-else>
+                        <button @click="dropItem" class="w-full bg-indigo-500 text-white p-3.5 rounded-xl font-bold hover:bg-indigo-600 transition text-sm tracking-wide shadow-md shadow-indigo-200 mt-5">
+                            REQUEST DROP
+                        </button>
+                    </template>
                 </div>
 
                 <div class="bg-white p-7 rounded-2xl shadow-sm border border-slate-300 flex flex-col gap-3">
@@ -314,14 +359,60 @@
                             </div>
                             <h2 class="text-xl font-extrabold text-slate-700">Pickup Operations</h2>
                         </div>
+                        <div class="grid grid-cols-[1fr_auto] gap-3 items-end mb-4">
+                            <div>
+                                <label class="text-xs text-slate-500 font-bold block mb-1.5">Target Item Type</label>
+                                <select v-model="formPickup.item_type" class="w-full p-3 input-pastel rounded-xl text-sm font-semibold cursor-pointer">
+                                    <option value="" disabled>Select Item Type</option>
+                                    <option v-for="it in configItemTypes" :key="it.name" :value="it.name">{{ it.name }}</option>
+                                </select>
+                            </div>
+                            <button @click="findPickupStock" class="bg-teal-100 text-teal-600 border border-teal-200 h-[46px] px-6 rounded-xl font-black hover:bg-teal-200 transition text-sm flex items-center justify-center">
+                                FIND STORAGE
+                            </button>
+                        </div>
+                        
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 h-[115px] flex flex-col justify-center overflow-hidden mb-4">
+                            <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Available Locations</div>
+                            <div v-if="!pickupResult.hasScanned" class="text-center text-slate-400 text-xs py-2 font-medium">
+                                Enter item type and click FIND STORAGE
+                            </div>
+                            <div v-else-if="pickupResult.slots.length === 0" class="text-rose-500 text-xs font-bold py-2 text-center bg-rose-50 rounded-lg">
+                                No stock found for this item.
+                            </div>
+                            <div v-else class="flex gap-2 overflow-x-auto pb-1 custom-scrollbar whitespace-nowrap items-center">
+                                <div v-for="s in pickupResult.slots" :key="s.point_name" @click="formPickup.point_name = s.point_name; showToast('Selected ' + s.point_name, true)" 
+                                     :class="['border bg-white rounded-xl p-2.5 flex flex-col justify-center items-center cursor-pointer hover:border-teal-300 hover:shadow-md transition text-center min-w-[95px] max-w-[95px] h-[55px] flex-shrink-0', formPickup.point_name === s.point_name ? 'border-teal-400 bg-teal-50 shadow-sm' : 'border-teal-100']">
+                                    <div class="font-extrabold text-slate-700 text-[10px] tracking-wide truncate w-full" v-text="s.point_name"></div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="mb-4">
-                            <label class="text-xs text-slate-500 font-bold block mb-1.5">Target Item Type</label>
-                            <input v-model="formPickup.item_type" class="w-full p-3 input-pastel rounded-xl text-sm font-semibold" placeholder="Enter item type to dispatch...">
+                            <label class="text-xs text-slate-500 font-bold block mb-1.5">Selected Level</label>
+                            <input readonly v-model="formPickup.point_name" class="w-full p-3 input-pastel rounded-xl text-sm font-semibold bg-slate-100 text-slate-500 cursor-not-allowed" placeholder="Select from locations above">
                         </div>
                     </div>
-                    <button @click="pickupItem" class="w-full bg-teal-500 text-white p-3.5 rounded-xl font-bold hover:bg-teal-600 transition text-sm shadow-md shadow-teal-200">
-                        REQUEST PICKUP
-                    </button>
+                    <template v-if="slots.find(s => s.point_name === formPickup.point_name)?.status === 'PICKUP_RESERVED'">
+                        <div class="flex flex-col gap-3 mt-5">
+                            <div v-if="useSensor" class="bg-indigo-50 border border-indigo-100 text-indigo-700 p-4 rounded-xl text-center text-sm font-bold shadow-inner">
+                                <span class="animate-pulse">Waiting for physical item pickup...</span>
+                            </div>
+                            <div class="flex gap-3">
+                                <button v-if="!useSensor" @click="confirmSlot(formPickup.point_name)" class="flex-1 bg-emerald-500 text-white p-3.5 rounded-xl font-bold hover:bg-emerald-600 transition text-sm shadow-md shadow-emerald-200 tracking-wide">
+                                    CONFIRM
+                                </button>
+                                <button @click="cancelTask(formPickup.point_name)" class="flex-1 bg-rose-500 text-white p-3.5 rounded-xl font-bold hover:bg-rose-600 transition text-sm shadow-md shadow-rose-200 tracking-wide">
+                                    CANCEL
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                    <template v-else>
+                        <button @click="pickupItem" class="w-full bg-teal-500 text-white p-3.5 rounded-xl font-bold hover:bg-teal-600 transition text-sm shadow-md shadow-teal-200 mt-5">
+                            REQUEST PICKUP
+                        </button>
+                    </template>
 
                     <div v-if="pickupResult.show" class="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex items-center justify-between mt-auto shadow-inner">
                         <div>
@@ -336,6 +427,143 @@
                 </div>
             </div>
             
+        <!-- WAREHOUSE FLOOR PLAN (TAB 5) -->
+        <div class="w-full flex flex-col mb-10">
+            <div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 class="text-3xl font-black tracking-tight text-slate-700">Map</h1>
+                    <!-- <p class="text-sm text-slate-500 mt-1">2.5D Storage Node Map</p> -->
+                </div>
+                <div class="flex items-center gap-3 text-xs font-bold text-slate-500">
+                    <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-indigo-600 inline-block"></span> Storage </div>
+                    <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-slate-200 border border-slate-300 inline-block"></span> Empty Space</div>
+                </div>
+            </div>
+
+            <div class="w-full grid grid-cols-1 lg:grid-cols-3 gap-8 pb-10">
+                <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center">
+                    <div class="flex items-center justify-between w-full mb-4 px-2">
+                        <span v-if="!isEditingMap" class="text-xs font-semibold text-slate-400">Click a storage node to view level details</span>
+                        <div v-else class="flex items-center gap-2">
+                            <span class="text-xs font-semibold text-indigo-600 animate-pulse">Edit Mode: Click node to pickup, click empty space to drop.</span>
+                        </div>
+                        <div class="flex gap-2 items-center">
+                            <div class="flex gap-1 mr-2">
+                                <button @click="zoomOut" class="bg-slate-100 text-slate-600 hover:bg-slate-200 px-2 py-1 rounded-lg text-xs font-bold" title="Zoom Out">-</button>
+                                <button @click="zoomIn" class="bg-slate-100 text-slate-600 hover:bg-slate-200 px-2 py-1 rounded-lg text-xs font-bold" title="Zoom In">+</button>
+                                <button @click="mapScale = 1.0" class="bg-slate-100 text-slate-600 hover:bg-slate-200 px-2 py-1 rounded-lg text-xs font-bold" title="Reset Zoom">Reset</button>
+                            </div>
+                            <div v-if="isEditingMap" class="flex gap-2 items-center text-xs text-slate-600 mr-2">
+                                W: <input type="number" v-model.number="mapWidth" class="w-12 border p-1 rounded">
+                                H: <input type="number" v-model.number="mapHeight" class="w-12 border p-1 rounded">
+                            </div>
+                            <button @click="toggleMapEdit()" :class="isEditingMap ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'" class="px-3 py-1 text-xs font-bold rounded-lg transition">
+                                {{ isEditingMap ? 'Save Layout' : 'Edit Layout' }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div @wheel="handleMapScroll" class="relative w-full max-w-[720px] aspect-square bg-slate-50 rounded-xl border border-dashed border-slate-300 flex items-center justify-center overflow-hidden" style="perspective: 1200px;">
+                        <div class="grid gap-2.5 w-[82%] h-[82%] mx-auto my-auto transition-transform duration-700" 
+                             :style="{ gridTemplateColumns: `repeat(${mapWidth + 1}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${mapHeight + 1}, minmax(0, 1fr))`, transform: `scale(${mapScale}) rotateX(60deg) rotateZ(-45deg)`, transformStyle: 'preserve-3d' }">
+                            
+                            <button v-for="cell in ((mapWidth + 1) * (mapHeight + 1))" :key="cell" type="button" 
+                                @click="handleMapCellClick(cell)"
+                                :class="getMapCellClass(cell)"
+                                :title="getMapCellTitle(cell)"
+                                style="transform-style: preserve-3d; transition: all 0.3s ease;">
+                                
+                                <template v-if="isAxisLabel(cell)">
+                                     <span class="text-[12px] font-black text-slate-400" style="transform: rotateZ(45deg) rotateX(-60deg);">
+                                          {{ getAxisLabel(cell) }}
+                                     </span>
+                                </template>
+                                
+                                <template v-else-if="getMapNodeAtGrid(cell)">
+                                    <div v-for="(l, i) in getMapNodeAtGrid(cell).levels" :key="l.point_name"
+                                         class="absolute inset-0 transition-all"
+                                         style="transform-style: preserve-3d;"
+                                         :style="{ transform: `translateZ(${(getMapNodeAtGrid(cell).levels.length - i) * 24}px)` }">
+                                         
+                                         <!-- Top Face -->
+                                         <div class="absolute inset-0 border border-black/10 flex items-center justify-center rounded-[1px]"
+                                              :class="getIsometricLevelClass(l.status)">
+                                         </div>
+
+                                         <!-- Bottom Face -->
+                                         <div class="absolute inset-0 border border-black/10"
+                                              :class="getIsometricLevelClass(l.status)"
+                                              style="transform: translateZ(-24px);"></div>
+
+                                         <!-- South Face -->
+                                         <div class="absolute w-full border-b border-l border-black/10"
+                                              :class="getIsometricLevelClass(l.status)"
+                                              style="top: 100%; height: 24px; transform-origin: top; transform: rotateX(-90deg);"></div>
+                                              
+                                         <!-- East Face -->
+                                         <div class="absolute h-full border-b border-r border-black/10"
+                                              :class="getIsometricLevelClass(l.status)"
+                                              style="left: 100%; width: 24px; transform-origin: left; transform: rotateY(90deg);"></div>
+                                              
+                                         <!-- North Face -->
+                                         <div class="absolute w-full border-t border-r border-black/10"
+                                              :class="getIsometricLevelClass(l.status)"
+                                              style="bottom: 100%; height: 24px; transform-origin: bottom; transform: rotateX(90deg);"></div>
+
+                                         <!-- West Face -->
+                                         <div class="absolute h-full border-t border-l border-black/10"
+                                              :class="getIsometricLevelClass(l.status)"
+                                              style="right: 100%; width: 24px; transform-origin: right; transform: rotateY(-90deg);"></div>
+                                    </div>
+                                </template>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+                    <h2 class="text-base font-black text-slate-700 mb-1">Rack Details</h2>
+                    <p class="text-xs text-slate-400 mb-5 font-medium">Select a node on the map</p>
+
+                    <div v-if="!selectedMapNode" class="flex-1 flex flex-col justify-center items-center text-center p-6 border border-dashed border-slate-200 rounded-xl bg-slate-50">
+                        <svg class="w-10 h-10 text-slate-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                        </svg>
+                        <p class="text-sm font-bold text-slate-400">No Rack Selected</p>
+                    </div>
+
+                    <div v-else class="flex-1 flex flex-col justify-start w-full">
+                        <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-100 w-full">
+                            <div>
+                                <h3 class="text-sm font-black text-slate-700" v-text="selectedMapNode.nodeName"></h3>
+                                <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider" v-text="selectedMapNode.storage_type || 'STANDARD'"></span>
+                            </div>
+                            <span class="text-xs bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full font-bold">
+                                {{ selectedMapNode.levels.length }} Levels
+                            </span>
+                        </div>
+                        <div class="space-y-2 w-full overflow-y-auto max-h-[380px] pr-1 custom-scrollbar">
+                            <div v-for="l in selectedMapNode.levels" :key="l.point_name" class="p-3 bg-white border border-slate-200 rounded-xl shadow-sm flex items-start justify-between gap-3 transition">
+                                <div class="flex items-start gap-2.5">
+                                    <span class="w-6 h-6 rounded-lg bg-slate-100 text-slate-600 font-bold text-xs flex items-center justify-center shrink-0" v-text="l.level_index + 1"></span>
+                                    <div>
+                                        <p class="text-xs font-bold text-slate-700" v-text="l.point_name.split(':')[1] || 'Level ' + (l.level_index + 1)"></p>
+                                        <p class="text-[10px] text-slate-500 mt-0.5 font-semibold">
+                                            <span v-if="l.current_item !== '—'" class="text-indigo-600">{{ l.current_item }}</span>
+                                            <span v-else class="text-slate-400 italic">Empty Space</span>
+                                        </p>
+                                    </div>
+                                </div>
+                                <span :class="['text-[9px] px-2 py-0.5 rounded-full border font-black uppercase tracking-wider', getBadgeClass(l.status)]">
+                                    {{ l.status }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
             <div class="bg-white rounded-2xl shadow-sm border border-slate-300 overflow-hidden mb-10">
                 <div class="p-6 border-b border-slate-100 bg-white flex justify-between items-center">
                     <h2 class="font-extrabold text-lg text-slate-700 tracking-wide">Inventory Flow</h2>
@@ -360,7 +588,7 @@
                             <tr class="bg-slate-100/50 border-b border-slate-200">
                                 <td colspan="9" class="p-3 pl-6 font-black text-xs tracking-wider text-slate-500 uppercase">
                                     <div class="flex items-center gap-3">
-                                        <span>Category Group:</span>
+                                        <span>Storage Node:</span>
                                         <span class="text-indigo-700 bg-indigo-100 px-3 py-1 rounded-lg font-bold" v-text="category"></span>
                                         <span class="text-slate-400 text-[10px] ml-auto bg-white border border-slate-200 px-2.5 py-1 rounded-md shadow-sm" v-text="groupSlots.length + ' node(s)'"></span>
                                     </div>
@@ -370,7 +598,12 @@
                             <tr v-for="s in groupSlots"
                                 :key="s.point_name"
                                 :class="['transition-colors border-b border-slate-50', getSlotRowStyle(category), !s.enabled ? 'opacity-40 grayscale' : '']">
-                                <td class="p-4 pl-6 font-black text-base font-mono tracking-wide text-slate-700" v-text="s.point_name"></td>
+                                <td class="p-4 pl-6 font-black text-sm font-mono tracking-wide text-slate-700">
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                                        <span v-text="s.point_name.includes(':') ? s.point_name.split(':')[1] : s.point_name"></span>
+                                    </div>
+                                </td>
                                 <td class="p-4">
                                     <div class="flex flex-col gap-1 items-start">
                                         <span :class="['px-3 py-1 text-[10px] rounded-full font-black border uppercase tracking-wider', getStatusClass(s)]"
@@ -384,7 +617,7 @@
                                     <span v-text="formatTime(s.items?.[0]?.in_time)"></span>
                                 </td>
                                 <td class="p-4 text-xs text-rose-500 font-bold">
-                                    <span v-text="s.last_drop_by || '—'"></span>
+                                    <span v-text="s.items?.[0]?.drop_by || '—'"></span>
                                 </td>
                                 <td class="p-4 text-xs text-slate-500 font-mono">
                                     <span v-text="formatTime(s.out_time)"></span>
@@ -412,12 +645,8 @@
                                 </td>
                                 <td class="p-4 pr-6 text-center">
                                     <div class="flex gap-2 justify-center">
-                                        <button v-if="s.status === 'DROP_RESERVED' || s.status === 'PICKUP_RESERVED'"
-                                            @click="confirmSlot(s.point_name)"
-                                            class="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border border-indigo-200 px-3 py-1.5 rounded-lg font-bold text-xs transition shadow-sm">
-                                            Confirm
-                                        </button>
-                                        <button @click="resetSlot(s.point_name)" class="bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 px-3 py-1.5 rounded-lg font-bold text-xs transition border border-slate-200 shadow-sm">
+
+                                        <button @click="resetSlot(s.point_name)" class="bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 px-3 py-1.5 rounded-lg font-bold text-xs transition border border-slate-200 shadow-sm w-full">
                                             Reset
                                         </button>
                                     </div>
@@ -442,7 +671,7 @@
                         + Add Profile
                     </button>
                 </div>
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto overflow-y-auto max-h-[300px] custom-scrollbar">
                     <table class="w-full text-left border-collapse text-sm">
                         <thead>
                             <tr class="text-xs font-bold text-slate-400 border-b border-slate-100 bg-slate-50 uppercase">
@@ -475,6 +704,85 @@
                 </div>
             </div>
 
+            <div class="bg-white p-7 rounded-2xl shadow-sm border border-slate-300 mb-8">
+                <div class="flex justify-between items-center mb-5 border-b border-slate-100 pb-4">
+                    <h2 class="font-extrabold text-xl text-slate-700 flex items-center gap-3">
+                        <span class="w-3 h-3 bg-pink-400 rounded-full"></span> Storage Types Configuration
+                    </h2>
+                    <button @click="addNewUnitType" class="bg-pink-100 text-pink-700 text-xs px-4 py-2 rounded-xl font-bold hover:bg-pink-200 transition border border-pink-200 shadow-sm">
+                        + Add Storage Type
+                    </button>
+                </div>
+                <div class="overflow-x-auto overflow-y-auto max-h-[300px] custom-scrollbar">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="text-xs font-bold text-slate-400 border-b border-slate-100 bg-slate-50 uppercase">
+                                <th class="p-4 rounded-tl-xl">Storage Type Name</th>
+                                <th class="p-4">Picking Strategy</th>
+                                <th class="p-4 text-right rounded-tr-xl">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-50">
+                            <tr v-for="(ut, utIdx) in configStorageTypes" :key="utIdx" class="hover:bg-slate-50/50">
+                                <td class="p-3">
+                                    <input v-model="ut.name" class="p-2.5 input-pastel rounded-lg text-xs font-mono font-bold w-64" placeholder="e.g. pallet stacker">
+                                </td>
+                                <td class="p-3">
+                                    <select v-model="ut.strategy" class="p-2.5 input-pastel rounded-lg text-xs font-bold cursor-pointer w-48">
+                                        <option value="FIFO">FIFO (First-In, First-Out)</option>
+                                        <option value="LIFO">LIFO (Last-In, First-Out)</option>
+                                    </select>
+                                </td>
+                                <td class="p-3 text-right">
+                                    <button @click="deleteUnitType(utIdx)" class="text-xs text-rose-500 hover:text-rose-700 font-bold bg-rose-50 px-3 py-2 rounded-lg border border-rose-100 hover:bg-rose-100 transition shadow-sm">Remove</button>
+                                </td>
+                            </tr>
+                            <tr v-if="configStorageTypes.length === 0">
+                                <td colspan="3" class="p-6 text-center text-slate-400 text-sm font-medium">No Storage Types defined. Using system default strategy.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+
+            <div class="bg-white p-7 rounded-2xl shadow-sm border border-slate-300 mb-8">
+                <div class="flex justify-between items-center mb-5 border-b border-slate-100 pb-4">
+                    <h2 class="font-extrabold text-xl text-slate-700 flex items-center gap-3">
+                        <span class="w-3 h-3 bg-emerald-400 rounded-full"></span> Item Types Configuration
+                    </h2>
+                    <button @click="addNewItemType" class="bg-emerald-100 text-emerald-700 text-xs px-4 py-2 rounded-xl font-bold hover:bg-emerald-200 transition border border-emerald-200 shadow-sm">
+                        + Add Item Type
+                    </button>
+                </div>
+                <div class="overflow-x-auto overflow-y-auto max-h-[300px] custom-scrollbar">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="text-xs font-bold text-slate-400 border-b border-slate-100 bg-slate-50 uppercase">
+                                <th class="p-4 rounded-tl-xl">Item Name / ID</th>
+                                <th class="p-4 text-right rounded-tr-xl">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-50">
+                            <tr v-for="(it, itIdx) in configItemTypes" :key="itIdx" class="hover:bg-slate-50/50">
+                                <td class="p-3">
+                                    <input v-model="it.name" class="p-2.5 input-pastel rounded-lg text-xs font-mono font-bold w-64" placeholder="e.g. cookie">
+                                </td>
+                                <td class="p-3 text-right">
+                                    <button @click="deleteItemType(itIdx)" class="text-xs text-rose-500 hover:text-rose-700 font-bold bg-rose-50 px-3 py-2 rounded-lg border border-rose-100 hover:bg-rose-100 transition shadow-sm">Remove</button>
+                                </td>
+                            </tr>
+                            <tr v-if="configItemTypes.length === 0">
+                                <td colspan="2" class="p-6 text-center text-slate-400 text-sm font-medium">No Item Types defined. You can still type custom names manually.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <datalist id="item-type-options">
+                        <option v-for="it in configItemTypes" :key="it.name" :value="it.name"></option>
+                    </datalist>
+                </div>
+            </div>
+
             <div class="bg-white p-7 rounded-2xl shadow-sm border border-slate-300 mb-10">
                 <div class="flex justify-between items-center mb-5 border-b border-slate-100 pb-4">
                     <h2 class="font-extrabold text-xl text-slate-700 flex items-center gap-3">
@@ -490,28 +798,56 @@
                 </div>
                 
                 <div class="space-y-4 max-h-[450px] overflow-y-auto pr-3 custom-scrollbar">
-                    <div v-for="(p, index) in configSlots" :key="p.point_name" class="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex justify-between items-center gap-6 hover:border-indigo-100 hover:shadow-sm transition">
-                        <div class="grid grid-cols-3 gap-6 flex-1">
-                            <div>
-                                <label class="text-[10px] text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Node Name</label>
-                                <span class="p-2.5 bg-white text-indigo-600 rounded-lg border border-slate-200 block text-sm font-mono font-black text-center shadow-sm" v-text="p.point_name"></span>
+                    <div v-for="(p, index) in configSlots" :key="p.point_name" class="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex justify-between items-start gap-6 hover:border-indigo-100 hover:shadow-sm transition">
+                        
+                        <div class="flex flex-col flex-1 w-full">
+                            <div class="grid grid-cols-3 gap-6 w-full">
+                                <div>
+                                    <label class="text-[10px] text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Node Name</label>
+                                    <span class="p-2.5 bg-white text-indigo-600 rounded-lg border border-slate-200 block text-sm font-mono font-black text-center shadow-sm" v-text="p.point_name"></span>
+                                </div>
+                                <div>
+                                    <label class="text-[10px] text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Storage Type</label>
+                                    <select v-model="p.storage_type" class="p-2.5 input-pastel rounded-lg w-full text-xs font-mono font-semibold cursor-pointer">
+                                        <option value="" disabled>Select Storage Type</option>
+                                        <option v-for="ut in configStorageTypes" :key="ut.name" :value="ut.name" v-text="ut.name"></option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-[10px] text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Hardware Mode</label>
+                                    <select v-model="p.enabled" class="p-2.5 input-pastel rounded-lg w-full text-xs cursor-pointer font-semibold">
+                                        <option :value="true">Enabled</option>
+                                        <option :value="false">Disabled</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div>
-                                <label class="text-[10px] text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Allowed Items (Comma Separated)</label>
-                                <input :value="p.allowed_item ? p.allowed_item.join(',') : ''" 
-                                       @input="updateAllowedItems(index, $event.target.value)"
-                                       class="p-2.5 input-pastel rounded-lg w-full text-xs font-mono font-semibold" placeholder="e.g. cookie,box">
+                            
+                            <div class="mt-4 flex justify-center">
+                                <button @click="p._show_levels = !p._show_levels" class="text-[10px] text-slate-400 font-bold uppercase tracking-wider hover:text-indigo-500 transition flex items-center gap-1">
+                                    <span v-text="p._show_levels ? 'Hide Levels Config' : 'Show Levels Config'"></span>
+                                    <svg :class="['w-3 h-3 transition-transform', p._show_levels ? 'rotate-180' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                </button>
                             </div>
-                            <div>
-                                <label class="text-[10px] text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Hardware Mode</label>
-                                <select v-model="p.enabled" class="p-2.5 input-pastel rounded-lg w-full text-xs cursor-pointer font-semibold">
-                                    <option :value="true">Enabled</option>
-                                    <option :value="false">Disabled</option>
-                                </select>
+
+                            <div v-if="p._show_levels" class="mt-4 border-t border-slate-200 pt-4 w-full">
+                                <div class="flex items-center gap-4 mb-3">
+                                    <label class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Max Levels:</label>
+                                    <input type="number" min="1" v-model.number="p.max_levels" @change="updateLevelsCount(index)" class="p-1.5 input-pastel rounded w-20 text-xs text-center font-bold">
+                                </div>
+                                <div v-if="p.levels && p.levels.length > 0" class="space-y-2">
+                                    <div v-for="(lvl, lIdx) in p.levels" :key="lIdx" class="flex gap-4 items-center bg-white p-2 rounded border border-slate-100">
+                                        <span class="text-[10px] font-bold text-slate-500 w-16">Lvl {{ lIdx + 1 }}</span>
+                                        <input v-model="lvl.level_name" placeholder="Name" class="p-1.5 input-pastel rounded text-xs w-1/3 font-semibold">
+                                        <input :value="lvl.allowed_item ? lvl.allowed_item.join(',') : ''" 
+                                               @input="updateLevelAllowedItems(index, lIdx, $event.target.value)"
+                                               list="item-type-options"
+                                               placeholder="Allowed Items (e.g. cookie, any)" class="p-1.5 input-pastel rounded text-xs flex-1 font-mono">
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        
-                        <div class="pt-5">
+
+                        <div class="pt-2">
                             <button @click="deletePoint(index)" class="bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 hover:border-rose-200 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-sm">
                                 Delete
                             </button>
@@ -624,6 +960,7 @@
                 <iframe id="manual-iframe" :src="manualUrl" class="w-full h-full border-0"></iframe>
             </div>
         </div>
+
     </main>
 </div>
 
@@ -645,9 +982,9 @@ createApp({
             globalUserId: "ROBOT_01",
             newPointName: "",
             formDrop: { point_name: "", item_type: "", note: "" },
-            formPickup: { item_type: "" },
+            formPickup: { point_name: "", item_type: "" },
             scanResult: { hasScanned: false, slots: [] },
-            pickupResult: { show: false, target: "-", note: "-" },
+            pickupResult: { show: false, target: "-", note: "-", hasScanned: false, slots: [] },
             toast: { show: false, msg: "", ok: true },
             history: [],        
             logFilter: {       
@@ -655,14 +992,42 @@ createApp({
                 point: "",
                 action: ""
             },
+            sceneReady: false,
+            selectedMapNode: null,
             configSlots: [],
             configUsers: [],
+            configStorageTypes: [],
+            configItemTypes: [],
             useSensor: true,
             configUseSensor: true,
             manualUrl: window.location.protocol + '//' + window.location.hostname + ':8081/',
+            globalStorageTypes: [],
+            globalPickupStrategy: "FIFO",
+            mapWidth: 10,
+            mapHeight: 10,
+            configMapLayout: {},
+            configMapSize: {width: 10, height: 10},
+            isEditingMap: false,
+            movingNode: null,
+            mapScale: 1.0,
+            resetModal: { show: false, pointName: "", status: "EMPTY" }
         }
     },
     methods: {
+        zoomIn() {
+            this.mapScale = Math.min(this.mapScale + 0.1, 3.0);
+        },
+        zoomOut() {
+            if (this.mapScale > 0.2) this.mapScale -= 0.1;
+        },
+        handleMapScroll(e) {
+            e.preventDefault();
+            if (e.deltaY < 0) {
+                this.zoomIn();
+            } else {
+                this.zoomOut();
+            }
+        },
         formatTime(isoStr) {
             if (!isoStr || isoStr === "—") return "—";
             try {
@@ -695,7 +1060,7 @@ createApp({
                 const res = await fetch("/slots")
                 if(!res.ok) return
                 const data = await res.json()
-                if (this.currentPage !== 1) return;
+                if (this.currentPage !== 1 && this.currentPage !== 5 && this.currentPage !== 2) return;
                 const hash = data.version || JSON.stringify(data.slots)
                 if(hash === this.lastHash) return
                 this.lastHash = hash
@@ -720,6 +1085,14 @@ createApp({
                 this.users = data.users || []
                 this.history = data.history || []
                 this.useSensor = data.use_sensor !== undefined ? data.use_sensor : true
+                this.globalStorageTypes = data.storage_types || [];
+                this.configItemTypes = data.item_types || [];
+                this.globalPickupStrategy = data.pickup_strategy || "FIFO";
+                this.configMapLayout = data.map_layout || {};
+                const ms = data.map_size || {width: 10, height: 10};
+                this.configMapSize = ms;
+                this.mapWidth = ms.width;
+                this.mapHeight = ms.height;
 
             } catch(e) {
                 console.error(e)
@@ -782,20 +1155,53 @@ createApp({
                 if (!res.ok) return;
                 const data = await res.json();
 
-                this.configSlots = (data.slots || []).map(s => ({
-                    slot_id: s.slot_id,
-                    point_name: s.point_name,
-                    enabled: s.enabled !== undefined ? s.enabled : true,
-                    allowed_item: Array.isArray(s.allowed_item) ? s.allowed_item : [],
-                    status: s.status,
-                    items: s.items || [],
-                    queue: s.queue || [],
-                    last_drop_by: s.last_drop_by || "",
-                    last_drop_time: s.last_drop_time || "",
-                    pickup_by: s.pickup_by || "",
-                    out_time: s.out_time || ""
-                }))
+                const nodeMap = {};
+                (data.slots || []).forEach(s => {
+                    const parts = s.point_name.split(':');
+                    const nodeName = parts[0];
+                    const levelName = parts.length > 1 ? parts[1] : "Level 1";
+
+                    if (!nodeMap[nodeName]) {
+                        nodeMap[nodeName] = {
+                            slot_id: s.slot_id,
+                            point_name: nodeName,
+                            enabled: s.enabled !== undefined ? s.enabled : true,
+                            allowed_item: [],
+                            storage_type: s.storage_type || "",
+                            max_levels: 0,
+                            levels: [],
+                            _show_levels: false,
+                            status: s.status,
+                            items: s.items || [],
+                            queue: s.queue || [],
+                            last_drop_by: s.last_drop_by || "",
+                            last_drop_time: s.last_drop_time || "",
+                            pickup_by: s.pickup_by || "",
+                            out_time: s.out_time || ""
+                        };
+                    }
+                    
+                    nodeMap[nodeName].levels.push({
+                        level_name: levelName,
+                        allowed_item: Array.isArray(s.allowed_item) ? s.allowed_item : [],
+                        _original_s: s
+                    });
+                    nodeMap[nodeName].max_levels++;
+                });
+
+                this.configSlots = Object.values(nodeMap);
                 this.configUsers = data.users || [];
+                this.configStorageTypes = data.storage_types && data.storage_types.length > 0 ? data.storage_types : [
+                    { name: "pallet stacker", strategy: "FIFO" },
+                    { name: "rack", strategy: "FIFO" },
+                    { name: "shelf", strategy: "FIFO" }
+                ];
+                this.configItemTypes = data.item_types && data.item_types.length > 0 ? data.item_types : [
+                    { name: "any" },
+                    { name: "cookie" },
+                    { name: "box" },
+                    { name: "wood" }
+                ];
                 this.configUseSensor = data.use_sensor !== undefined ? data.use_sensor : true;
             } catch (e) {
                 this.showToast("Failed to load config", false);
@@ -880,9 +1286,7 @@ createApp({
                 if(!res.ok) return this.showToast(d.detail || "Error", false)
                 
                 this.showToast(d.message || "Dropped successfully", true)
-                this.formDrop = { point_name: "", item_type: "", note: "" }
-                this.scanResult.slots = []
-                this.scanResult.hasScanned = false
+                // Do not clear point_name so user can confirm
                 this.lastHash = ""
                 this.loadSlots()
             } catch (e) { this.showToast("Network Error", false) }
@@ -891,17 +1295,68 @@ createApp({
             this.formDrop.point_name = pointName
             this.showToast("Selected " + pointName, true)
         },
+        findPickupStock() {
+            const item = this.formPickup.item_type.trim();
+            if (!item) {
+                this.showToast("Please enter item type", false);
+                return;
+            }
+            
+            let matches = this.slots.filter(s => s.status === 'FULL' && s.enabled && s.items && s.items.length > 0 && s.items[0].item_type === item);
+            
+            matches.sort((a, b) => {
+                const parseTime = (timeStr) => {
+                    if (!timeStr) return 0;
+                    // format: DD/MM/YY HH:MM:SS
+                    const parts = timeStr.split(' ');
+                    if (parts.length !== 2) return 0;
+                    const dateParts = parts[0].split('/');
+                    const timeParts = parts[1].split(':');
+                    if (dateParts.length !== 3 || timeParts.length !== 3) return 0;
+                    // year is 2000 + YY
+                    const year = 2000 + parseInt(dateParts[2], 10);
+                    const month = parseInt(dateParts[1], 10) - 1;
+                    const day = parseInt(dateParts[0], 10);
+                    return new Date(year, month, day, timeParts[0], timeParts[1], timeParts[2]).getTime();
+                };
+                
+                const timeA = parseTime(a.items[0]?.in_time);
+                const timeB = parseTime(b.items[0]?.in_time);
+                
+                return timeA - timeB;
+            });
+            
+            // Apply LIFO if the top candidate uses LIFO
+            if (matches.length > 0) {
+                let primaryStrategy = this.globalPickupStrategy;
+                if (matches[0].storage_type) {
+                    const ut = this.globalStorageTypes.find(u => u.name === matches[0].storage_type);
+                    if (ut && ut.strategy) primaryStrategy = ut.strategy;
+                }
+                if (primaryStrategy === "LIFO") {
+                    matches.reverse();
+                }
+            }
+
+            this.pickupResult.slots = matches;
+            this.pickupResult.hasScanned = true;
+            if (this.pickupResult.slots.length > 0) {
+                this.formPickup.point_name = this.pickupResult.slots[0].point_name;
+            } else {
+                this.formPickup.point_name = "";
+            }
+        },
         async pickupItem() {
-            if(!this.formPickup.item_type.trim()){
-                this.showToast("Please input target item type", false);
+            if(!this.formPickup.point_name){
+                this.showToast("Please select a target storage level", false);
                 return;
             }
             try {
-                const res = await fetch("/item/pickup", {
+                const res = await fetch("/slot/pickup", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ 
-                        item_type: this.formPickup.item_type.trim(),
+                        point_name: this.formPickup.point_name,
                         user_id: this.globalUserId
                     })
                 })
@@ -915,20 +1370,57 @@ createApp({
                 this.pickupResult.note = d.dispatched_item?.note ?? "-";
                 this.pickupResult.show = true
                 this.showToast("Pickup command successfully dispatched!", true)
-                this.formPickup.item_type = ""
+                // Do not clear point_name so user can confirm
                 this.lastHash = ""
                 this.loadSlots()
             } catch (e) { this.showToast("Network Error", false) }
         },
-        async resetSlot(pointName) {
+        resetSlot(pointName) {
+            if (!this.use_sensor) {
+                this.resetModal.pointName = pointName;
+                this.resetModal.status = "EMPTY";
+                this.resetModal.show = true;
+            } else {
+                if (confirm(`Are you sure you want to reset ${pointName}?`)) {
+                    this.executeReset(pointName, "");
+                }
+            }
+        },
+        async executeReset(pointName, targetStatus) {
+            this.resetModal.show = false;
             try {
                 const res = await fetch("/slot/reset", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ point_name: pointName, status: targetStatus })
+                })
+                if(res.ok) {
+                    this.showToast(`Reset ${pointName} Successful`, true)
+                    this.lastHash = ""
+                    this.loadSlots()
+                }
+            } catch (e) { this.showToast("Network Error", false) }
+        },
+        async cancelTask(pointName) {
+            try {
+                const res = await fetch("/slot/cancel", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ point_name: pointName })
                 })
                 if(res.ok) {
-                    this.showToast(`Reset ${pointName} Successful`, true)
+                    this.showToast(`Cancelled task at ${pointName}`, true)
+                    if (this.formDrop.point_name === pointName) {
+                        this.formDrop = { point_name: "", item_type: "", note: "" }
+                        this.scanResult.hasScanned = false
+                        this.scanResult.slots = []
+                    }
+                    if (this.formPickup.point_name === pointName) {
+                        this.formPickup.point_name = ""
+                        this.pickupResult.hasScanned = false
+                        this.pickupResult.slots = []
+                        this.pickupResult.show = false
+                    }
                     this.lastHash = ""
                     this.loadSlots()
                 }
@@ -944,6 +1436,17 @@ createApp({
                 const d = await res.json()
                 if(res.ok) {
                     this.showToast(d.message || `Confirmed ${pointName} Successful`, true)
+                    if (this.formDrop.point_name === pointName) {
+                        this.formDrop = { point_name: "", item_type: "", note: "" }
+                        this.scanResult.hasScanned = false
+                        this.scanResult.slots = []
+                    }
+                    if (this.formPickup.point_name === pointName) {
+                        this.formPickup.point_name = ""
+                        this.pickupResult.hasScanned = false
+                        this.pickupResult.slots = []
+                        this.pickupResult.show = false
+                    }
                     this.lastHash = ""
                     this.loadSlots()
                 } else {
@@ -961,6 +1464,21 @@ createApp({
         deleteUser(index){
             this.configUsers.splice(index,1)
         },
+        addNewUnitType() {
+            this.configStorageTypes.push({
+                name: "new storage type",
+                strategy: "FIFO"
+            })
+        },
+        deleteUnitType(index) {
+            this.configStorageTypes.splice(index, 1)
+        },
+        addNewItemType() {
+            this.configItemTypes.push({ name: "new_item" })
+        },
+        deleteItemType(index) {
+            this.configItemTypes.splice(index, 1)
+        },
         addNewPoint() {
             const name = this.newPointName.trim().toUpperCase();
             if (!name) return this.showToast("Point name cannot be empty", false);
@@ -973,6 +1491,10 @@ createApp({
                 point_name: name,
                 enabled: true,
                 allowed_item: [],
+                storage_type: "",
+                max_levels: 1,
+                levels: [{ level_name: "Level 1", allowed_item: [] }],
+                _show_levels: false,
                 items: [],
                 queue: [],
                 status: "EMPTY",
@@ -987,11 +1509,24 @@ createApp({
         deletePoint(index){
             this.configSlots.splice(index,1);
         },
-        updateAllowedItems(index, value) {
-            const arr = value
-                ? value.split(",").map(x => x.trim()).filter(Boolean)
-                : [];
-            this.configSlots[index].allowed_item = arr;
+        updateLevelsCount(index) {
+            let max = parseInt(this.configSlots[index].max_levels);
+            if (isNaN(max) || max < 1) max = 1;
+            this.configSlots[index].max_levels = max;
+            
+            let currentLevels = this.configSlots[index].levels || [];
+            if (currentLevels.length < max) {
+                for (let i = currentLevels.length; i < max; i++) {
+                    currentLevels.push({ level_name: "Level " + (i + 1), allowed_item: [] });
+                }
+            } else if (currentLevels.length > max) {
+                currentLevels = currentLevels.slice(0, max);
+            }
+            this.configSlots[index].levels = currentLevels;
+        },
+        updateLevelAllowedItems(index, lIdx, value) {
+            const arr = value ? value.split(",").map(x => x.trim()).filter(Boolean) : [];
+            this.configSlots[index].levels[lIdx].allowed_item = arr;
         },
         async syncConfigToBackend() {
             try {
@@ -1000,20 +1535,49 @@ createApp({
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         users: this.configUsers,
+                        storage_types: this.configStorageTypes,
+                        item_types: this.configItemTypes,
                         use_sensor: this.configUseSensor,
-                        slots: this.configSlots.map(s => ({
-                            slot_id: s.slot_id,
-                            point_name: s.point_name,
-                            enabled: s.enabled,
-                            allowed_item: s.allowed_item,
-                            status: s.status,
-                            items: s.items || [],
-                            queue: s.queue || [],
-                            last_drop_by: s.last_drop_by || "",
-                            last_drop_time: s.last_drop_time || "",
-                            pickup_by: s.pickup_by || "",
-                            out_time: s.out_time || ""
-                        }))
+                        map_layout: this.configMapLayout,
+                        map_size: this.configMapSize,
+                        slots: this.configSlots.flatMap(node => {
+                            if (!node.levels || node.levels.length === 0) {
+                                return [{
+                                    slot_id: node.slot_id,
+                                    point_name: node.point_name,
+                                    enabled: node.enabled,
+                                    allowed_item: node.allowed_item,
+                                    storage_type: node.storage_type,
+                                    max_capacity: 1,
+                                    status: node.status,
+                                    items: node.items || [],
+                                    queue: node.queue || [],
+                                    last_drop_by: node.last_drop_by || "",
+                                    last_drop_time: node.last_drop_time || "",
+                                    pickup_by: node.pickup_by || "",
+                                    out_time: node.out_time || ""
+                                }];
+                            }
+                            return node.levels.map((l, i) => ({
+                                slot_id: node.slot_id, // keep same slot_id base
+                                point_name: `${node.point_name}:${l.level_name}`,
+                                parent_node: node.point_name,
+                                level_index: i,
+                                enabled: node.enabled,
+                                allowed_item: l.allowed_item,
+                                storage_type: node.storage_type,
+                                max_capacity: 1,
+                                status: l._original_s ? l._original_s.status : (i === 0 ? node.status : "EMPTY"),
+                                items: l._original_s ? (l._original_s.items || []) : (i === 0 ? (node.items || []) : []),
+                                queue: l._original_s ? (l._original_s.queue || []) : (i === 0 ? (node.queue || []) : []),
+                                last_drop_by: l._original_s ? (l._original_s.last_drop_by || "") : (i === 0 ? (node.last_drop_by || "") : ""),
+                                last_drop_time: l._original_s ? (l._original_s.last_drop_time || "") : (i === 0 ? (node.last_drop_time || "") : ""),
+                                pickup_by: l._original_s ? (l._original_s.pickup_by || "") : (i === 0 ? (node.pickup_by || "") : ""),
+                                out_time: l._original_s ? (l._original_s.out_time || "") : (i === 0 ? (node.out_time || "") : ""),
+                                reserved_for: l._original_s ? (l._original_s.reserved_for || "") : (i === 0 ? (node.reserved_for || "") : ""),
+                                reserved_item_type: l._original_s ? (l._original_s.reserved_item_type || "") : (i === 0 ? (node.reserved_item_type || "") : "")
+                            }));
+                        })
                     })
                 });
                 const d = await res.json();
@@ -1030,22 +1594,210 @@ createApp({
             if (iframe) {
                 iframe.src = iframe.src;
             }
+        },
+        async toggleMapEdit() {
+            if (this.isEditingMap) {
+                this.isEditingMap = false;
+                this.movingNode = null;
+                // Save Map Layout to backend
+                try {
+                    const res = await fetch("/config/map", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            map_layout: this.configMapLayout,
+                            map_size: { width: this.mapWidth, height: this.mapHeight }
+                        })
+                    });
+                    if (res.ok) {
+                        this.showToast("Map Layout Saved!", true);
+                        this.lastHash = ""; // force reload
+                    } else {
+                        this.showToast("Failed to save map layout", false);
+                    }
+                } catch (e) {
+                    this.showToast("Network Error", false);
+                }
+            } else {
+                this.isEditingMap = true;
+                this.showToast("Map Edit Mode Enabled", true);
+            }
+        },
+        isAxisLabel(cellNumber) {
+            const x = (cellNumber - 1) % (this.mapWidth + 1);
+            const y = Math.floor((cellNumber - 1) / (this.mapWidth + 1));
+            return (x === 0 || y === 0) && !(x === 0 && y === 0);
+        },
+        getAxisLabel(cellNumber) {
+            const x = (cellNumber - 1) % (this.mapWidth + 1);
+            const y = Math.floor((cellNumber - 1) / (this.mapWidth + 1));
+            if (x === 0 && y > 0) return y.toString();
+            if (y === 0 && x > 0) {
+                let s = "";
+                let n = x;
+                while (n > 0) {
+                    let m = (n - 1) % 26;
+                    s = String.fromCharCode(65 + m) + s;
+                    n = Math.floor((n - m) / 26);
+                }
+                return s;
+            }
+            return "";
+        },
+        getMapNodeAtGrid(cellNumber) {
+            const x = (cellNumber - 1) % (this.mapWidth + 1);
+            const y = Math.floor((cellNumber - 1) / (this.mapWidth + 1));
+            if (x === 0 || y === 0) return null;
+            
+            // Map actual grid X,Y back to our computed grid which is Width x Height
+            const actualCell = (y - 1) * this.mapWidth + (x - 1);
+            return this.computedMapGrid[actualCell];
+        },
+        getMapCellClass(cellNumber) {
+            let base = "relative flex flex-col items-center justify-center transition-all duration-300 text-[10px] select-none ";
+            
+            const x = (cellNumber - 1) % (this.mapWidth + 1);
+            const y = Math.floor((cellNumber - 1) / (this.mapWidth + 1));
+            
+            if (x === 0 && y === 0) {
+                return base + "bg-transparent pointer-events-none";
+            }
+            if (x === 0 || y === 0) {
+                return base + "bg-transparent text-slate-400 font-bold pointer-events-none";
+            }
+
+            const node = this.getMapNodeAtGrid(cellNumber);
+            
+            if (this.isEditingMap) {
+                if (node && this.movingNode === node.nodeName) {
+                    base += "bg-indigo-300 ring-2 ring-indigo-500 ring-offset-2 z-20 scale-110 opacity-70";
+                } else if (node) {
+                    base += "bg-indigo-400 shadow-md cursor-grab";
+                } else {
+                    base += this.movingNode ? "bg-emerald-100 hover:bg-emerald-200 border-2 border-dashed border-emerald-400 cursor-crosshair z-10" : "bg-slate-100 border border-slate-200/50";
+                }
+                return base;
+            }
+
+            if (node) {
+                if (this.selectedMapNode && this.selectedMapNode.nodeName === node.nodeName) {
+                    base += "bg-indigo-500 text-white shadow-2xl ring-2 ring-indigo-300 z-10 font-bold scale-105";
+                } else {
+                    base += "bg-indigo-400 text-white hover:bg-indigo-300 font-semibold shadow-lg cursor-pointer";
+                }
+            } else {
+                base += "bg-slate-100 border border-slate-200/50 text-transparent";
+            }
+            return base;
+        },
+        getMapCellTitle(cellNumber) {
+            if (this.isAxisLabel(cellNumber)) return "";
+            const node = this.getMapNodeAtGrid(cellNumber);
+            if (node) {
+                return `${node.nodeName} (${node.levels.length} Levels)`;
+            }
+            return `Empty Space`;
+        },
+        handleMapCellClick(cellNumber) {
+            if (this.isAxisLabel(cellNumber) || ((cellNumber - 1) % (this.mapWidth + 1) === 0 && Math.floor((cellNumber - 1) / (this.mapWidth + 1)) === 0)) return;
+            
+            const node = this.getMapNodeAtGrid(cellNumber);
+            
+            if (this.isEditingMap) {
+                if (this.movingNode) {
+                    if (!node || node.nodeName === this.movingNode) {
+                        // Drop it here
+                        const x = (cellNumber - 1) % (this.mapWidth + 1);
+                        const y = Math.floor((cellNumber - 1) / (this.mapWidth + 1));
+                        this.configMapLayout[this.movingNode] = {x, y};
+                        this.movingNode = null;
+                        this.showToast("Node Moved!", true);
+                    } else {
+                        this.showToast("Cannot drop on existing node!", false);
+                    }
+                } else if (node) {
+                    this.movingNode = node.nodeName; // Pick it up
+                }
+                return;
+            }
+
+            if (node) {
+                this.selectedMapNode = node;
+            } else {
+                this.selectedMapNode = null;
+            }
+        },
+        getIsometricLevelClass(status) {
+            if (status === 'EMPTY') return 'bg-emerald-400';
+            if (status === 'FULL') return 'bg-rose-500';
+            if (status === 'DROP_RESERVED' || status === 'PICKUP_RESERVED') return 'bg-amber-400';
+            return 'bg-slate-200';
+        },
+        getBadgeClass(status) {
+            if (status === 'EMPTY') return 'bg-emerald-50 text-emerald-600 border-emerald-200';
+            if (status === 'FULL') return 'bg-rose-50 text-rose-600 border-rose-200';
+            if (status === 'DROP_RESERVED' || status === 'PICKUP_RESERVED') return 'bg-amber-50 text-amber-600 border-amber-200';
+            return 'bg-slate-50 text-slate-600 border-slate-200';
         }
     },
     computed: {
+        pickupableSlots() {
+            return this.slots.filter(s => s.status === 'FULL' && s.enabled);
+        },
         groupedSlots() {
             const groups = {};
             this.slots.forEach(s => {
-                let category = "ALL ITEMS";
-                if (Array.isArray(s.allowed_item) && s.allowed_item.length > 0) {
-                    category = s.allowed_item.join(", ");
-                }
+                let category = s.point_name.includes(':') ? s.point_name.split(':')[0] : s.point_name;
                 if (!groups[category]) {
                     groups[category] = [];
                 }
                 groups[category].push(s);
             });
             return groups;
+        },
+        mapNodes() {
+            const groups = this.groupedSlots;
+            return Object.keys(groups).map(nodeName => {
+                const levels = [...groups[nodeName]].sort((a,b) => b.level_index - a.level_index);
+                return {
+                    nodeName: nodeName,
+                    storage_type: levels[0].storage_type,
+                    levels: levels
+                };
+            });
+        },
+        computedMapGrid() {
+            const grid = new Array(this.mapWidth * this.mapHeight).fill(null);
+            
+            // First pass: place all configured nodes
+            const unplaced = [];
+            this.mapNodes.forEach((node) => {
+                let pos = this.configMapLayout ? this.configMapLayout[node.nodeName] : null;
+                
+                if (pos && pos.x >= 1 && pos.x <= this.mapWidth && pos.y >= 1 && pos.y <= this.mapHeight) {
+                    const cellIdx = (pos.y - 1) * this.mapWidth + (pos.x - 1);
+                    if (grid[cellIdx] === null) {
+                        grid[cellIdx] = node;
+                    } else {
+                        unplaced.push(node); // Collision
+                    }
+                } else {
+                    unplaced.push(node);
+                }
+            });
+            
+            // Second pass: place unplaced nodes in the first empty spots
+            let emptyIdx = 0;
+            unplaced.forEach(node => {
+                while(emptyIdx < grid.length && grid[emptyIdx] !== null) {
+                    emptyIdx++;
+                }
+                if (emptyIdx < grid.length) {
+                    grid[emptyIdx] = node;
+                }
+            });
+            
+            return grid;
         },
         filteredHistory() {
             return this.history.filter(h => {
@@ -1061,6 +1813,10 @@ createApp({
             if(page === 2){this.loadConfigDataOnly()}
             if(page === 3){this.loadHistory()}
             if(page === 4){this.reloadManualIframe()}
+            if(page === 5){
+                this.lastHash = "";
+                this.loadSlots();
+            }
             if(page === 1){
                 this.lastHash = ""
                 this.loadSlots()}
@@ -1069,8 +1825,8 @@ createApp({
     mounted() {
         this.loadSlots()
         this.timer = setInterval(() => {
-            if(this.currentPage === 1){
-                this.loadSlots()
+            if(this.currentPage === 1 || this.currentPage === 5){
+                this.loadSlots();
             }
             if(this.currentPage === 3){
                 this.loadHistory()

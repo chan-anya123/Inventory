@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  wms:
+    build: .
+    container_name: inventory_wms
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    command: python main.py
+
+  manual:
+    build: .
+    container_name: inventory_manual
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+    command: python manual.py
