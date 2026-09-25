@@ -283,7 +283,7 @@ The system configuration is stored in config file and synchronized with memory:
 
 ## 📖 System Manual Reader
 
-A dedicated **Manual Reader** service is provided to serve the User Manual ([MANUAL.md](file:///home/cookies/fifo/all_features/MANUAL.md)) as an interactive, styled HTML webpage.
+A dedicated **Manual Reader** service is provided to serve the User Manual ([MANUAL.md](file:///home/cookies/inventory/muti_inventory/MANUAL.md)) as an interactive, styled HTML webpage.
 
 - **Port**: `8081`
 - **Primary Endpoint**: `http://localhost:8081/` (serves the operations manual page)
@@ -303,16 +303,14 @@ A dedicated **Manual Reader** service is provided to serve the User Manual ([MAN
 
 2. Run the Main WMS application:
    ```bash
-   python all_features/scripts/main.py
+   python muti_inventory/main.py
    ```
-   *(Alternatively: `python all_features/main.py`)*
    * Open the control panel at `http://localhost:8000/` in your web browser.
 
 3. Run the User Manual Reader service:
    ```bash
-   python all_features/scripts/manual.py
+   python muti_inventory/manual.py
    ```
-   *(Alternatively: `python all_features/manual.py`)*
    * Open the operations manual at `http://localhost:8081/` in your web browser.
 
 ### Option 2: Run with Docker Compose
